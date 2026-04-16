@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="pt-PT">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Battlezone 3D - Computação Gráfica UTAD</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <!-- HUD informativo (será expandido nas próximas fases) -->
+    <div id="hud">
+        <div id="info">
+            <h1>BATTLEZONE 3D</h1>
+            <p>Fase 1 — Base Visual</p>
+            <p class="hint">Computação Gráfica 2025/2026 · UTAD</p>
+        </div>
+    </div>
+
+    <!-- Canvas onde o three.js desenha a cena -->
+    <canvas id="battlezone-canvas"></canvas>
+
+    <!-- 
+        Import map: permite usar "import ... from 'three'" sem bundler.
+        Three.js é carregado diretamente via CDN (unpkg).
+        Nas próximas fases, poderá ser útil migrar para Vite se o projeto crescer.
+    -->
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+            "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+        }
+    }
+    </script>
+
+    <!-- Ponto de entrada da aplicação -->
+    <script type="module" src="js/main.js"></script>
+</body>
+</html>

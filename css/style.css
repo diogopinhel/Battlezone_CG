@@ -1,0 +1,49 @@
+/* Reset básico e ocupar toda a janela */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+html, body {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background-color: #000;
+    font-family: 'Courier New', monospace; /* Fonte retro */
+    color: #00ff00; /* Verde clássico dos monitores vetoriais */
+}
+
+/* Canvas ocupa todo o ecrã */
+#battlezone-canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+}
+
+/* HUD sobreposto ao canvas */
+#hud {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    padding: 20px;
+    pointer-events: none; /* Não intercetar cliques do rato */
+    z-index: 10;
+}
+
+#info h1 {
+    font-size: 24px;
+    letter-spacing: 4px;
+    text-shadow: 0 0 10px #00ff00;
+}
+
+#info p {
+    font-size: 14px;
+    margin-top: 4px;
+}
+
+#info .hint {
+    opacity: 0.6;
+    font-size: 12px;
+}
