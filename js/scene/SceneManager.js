@@ -2,6 +2,9 @@ import * as THREE from 'three';
 import { CONFIG } from '../utils/Constants.js';
 import { Ground } from './Ground.js';
 import { Lighting } from './Lighting.js';
+import { InputHandler } from '../input/InputHandler.js';
+import { Player } from '../entities/Player.js';
+import { HUD } from '../ui/HUD.js';
 
 /**
  * Classe central que gere a cena three.js.
@@ -30,6 +33,21 @@ export class SceneManager {
 
         this.lighting = new Lighting();
         this.lighting.addTo(this.scene);
+
+        // Input e jogador
+        this.inputHandler = new InputHandler();
+        this.player = new Player(this.scene, this.camera, this.inputHandler);
+
+        // Estado do jogo
+        this.score = 0;
+        this.lives = 3;
+        this.enemies = []; // preenchido na Fase 3
+
+        // HUD
+        this.hud = new HUD();
+
+        // Clock para calcular delta time correto por frame
+        this.clock = new THREE.Clock();
 
         // Tratar redimensionamento da janela
         window.addEventListener('resize', () => this._onWindowResize());
@@ -113,17 +131,15 @@ export class SceneManager {
         animate();
     }
 
-    /**
-     * Atualizações por frame. Nesta fase apenas faz uma rotação suave
-     * da câmara à volta do centro, para se poder apreciar o cenário.
-     * Em fases futuras este método será substituído pela lógica do jogador.
-     */
     _update() {
-        const time = performance.now() * 0.0002;
-        const radius = 80;
-        this.camera.position.x = Math.cos(time) * radius;
-        this.camera.position.z = Math.sin(time) * radius;
-        this.camera.position.y = 20;
-        this.camera.lookAt(0, 0, 0);
+        const delta = this.clock.getDelta();
+        this.player.update(delta);
+        this.hud.update(
+            this.player.tank.position,
+            this.player.tank.rotation.y,
+            this.enemies,
+            this.score,
+            this.lives
+        );
     }
 }

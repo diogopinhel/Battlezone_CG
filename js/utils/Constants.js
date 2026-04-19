@@ -21,7 +21,7 @@ export const CONFIG = {
     // Câmara
     CAMERA: {
         FOV: 70,
-        NEAR: 1.0,                  // Mínimo 1.0 — evita Z-fighting (ratio far/near deve ser baixo)
+        NEAR: 0.5,                  // 0.5 permite ver o canhão sem Z-fighting relevante (far/near = 4000)
         FAR: 2000,                  // Fog termina em 1500; FAR de 2000 é suficiente e preserva precisão do depth buffer
         INITIAL_POSITION: { x: 0, y: 15, z: 50 },
     },
@@ -36,5 +36,27 @@ export const CONFIG = {
     LIGHTS: {
         AMBIENT_INTENSITY: 0.3,
         DIRECTIONAL_INTENSITY: 0.8,
+    },
+
+    // Jogador / tanque
+    PLAYER: {
+        MOVE_SPEED:           10,    // unidades por segundo
+        ROTATE_SPEED:          1,  // radianos por segundo
+        CAMERA_HEIGHT:         2.5,  // altura dos olhos acima do solo
+        FIRE_COOLDOWN:         0.5,  // segundos mínimos entre disparos
+        PROJECTILE_SPEED:    150,    // unidades por segundo
+        PROJECTILE_MAX_DIST: 800,    // distância máxima antes de desaparecer
+    },
+
+    // Radar / minimapa
+    RADAR: {
+        RANGE: 500,   // unidades do mundo que cabem no raio do radar
+    },
+
+    // Cores adicionais (tanque)
+    TANK_COLORS: {
+        BODY:   0x2a4a1a,   // verde militar escuro
+        TRACK:  0x1a3010,   // verde ainda mais escuro para as lagartas
+        CANNON: 0x00ff00,   // verde fosforescente retro (MeshBasicMaterial, não precisa de luz)
     },
 };

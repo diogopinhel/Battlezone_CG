@@ -1,4 +1,3 @@
-/* Reset básico e ocupar toda a janela */
 * {
     margin: 0;
     padding: 0;
@@ -10,40 +9,52 @@ html, body {
     height: 100%;
     overflow: hidden;
     background-color: #000;
-    font-family: 'Courier New', monospace; /* Fonte retro */
-    color: #00ff00; /* Verde clássico dos monitores vetoriais */
+    font-family: 'Courier New', monospace;
+    color: #00ff00;
 }
 
-/* Canvas ocupa todo o ecrã */
 #battlezone-canvas {
     display: block;
     width: 100%;
     height: 100%;
 }
 
-/* HUD sobreposto ao canvas */
+/* HUD sobreposto — não interceta eventos de input */
 #hud {
     position: absolute;
     top: 0;
     left: 0;
     width: 100%;
-    padding: 20px;
-    pointer-events: none; /* Não intercetar cliques do rato */
+    height: 100%;
+    pointer-events: none;
     z-index: 10;
 }
 
-#info h1 {
-    font-size: 24px;
-    letter-spacing: 4px;
-    text-shadow: 0 0 10px #00ff00;
+/* Canto superior esquerdo: vidas e score */
+#hud-left {
+    position: absolute;
+    top: 20px;
+    left: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
 }
 
-#info p {
-    font-size: 14px;
-    margin-top: 4px;
+#hud-lives {
+    font-size: 18px;
+    letter-spacing: 2px;
+    text-shadow: 0 0 8px #00ff00;
 }
 
-#info .hint {
-    opacity: 0.6;
-    font-size: 12px;
+#hud-score {
+    font-size: 16px;
+    letter-spacing: 2px;
+    text-shadow: 0 0 8px #00ff00;
+}
+
+/* Canto superior direito: radar */
+#hud-radar {
+    position: absolute;
+    top: 10px;
+    right: 10px;
 }

@@ -7,23 +7,21 @@
     <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
-    <!-- HUD informativo (será expandido nas próximas fases) -->
+    <!-- HUD sobreposto ao canvas -->
     <div id="hud">
-        <div id="info">
-            <h1>BATTLEZONE 3D</h1>
-            <p>Fase 1 — Base Visual</p>
-            <p class="hint">Computação Gráfica 2025/2026 · UTAD</p>
+        <!-- Canto superior esquerdo: vidas e score -->
+        <div id="hud-left">
+            <div id="hud-lives">VIDAS: ♥♥♥</div>
+            <div id="hud-score">SCORE: 000000</div>
         </div>
+
+        <!-- Canto superior direito: radar -->
+        <canvas id="hud-radar" width="200" height="200"></canvas>
     </div>
 
-    <!-- Canvas onde o three.js desenha a cena -->
+    <!-- Canvas onde o Three.js desenha a cena -->
     <canvas id="battlezone-canvas"></canvas>
 
-    <!-- 
-        Import map: permite usar "import ... from 'three'" sem bundler.
-        Three.js é carregado diretamente via CDN (unpkg).
-        Nas próximas fases, poderá ser útil migrar para Vite se o projeto crescer.
-    -->
     <script type="importmap">
     {
         "imports": {
@@ -33,7 +31,6 @@
     }
     </script>
 
-    <!-- Ponto de entrada da aplicação -->
     <script type="module" src="js/main.js"></script>
 </body>
 </html>
