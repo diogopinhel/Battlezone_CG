@@ -2,9 +2,11 @@ import * as THREE from 'three';
 import { CONFIG } from '../utils/Constants.js';
 import { Ground } from './Ground.js';
 import { Lighting } from './Lighting.js';
+import { Environment } from './Environment.js';
 import { InputHandler } from '../input/InputHandler.js';
 import { Player } from '../entities/Player.js';
 import { HUD } from '../ui/HUD.js';
+import { AudioManager } from '../audio/AudioManager.js';
 
 /**
  * Classe central que gere a cena three.js.
@@ -34,9 +36,13 @@ export class SceneManager {
         this.lighting = new Lighting();
         this.lighting.addTo(this.scene);
 
-        // Input e jogador
+        this.environment = new Environment();
+        this.environment.addTo(this.scene);
+
+        // Input, áudio e jogador
         this.inputHandler = new InputHandler();
-        this.player = new Player(this.scene, this.camera, this.inputHandler);
+        this.audio = new AudioManager();
+        this.player = new Player(this.scene, this.camera, this.inputHandler, this.audio);
 
         // Estado do jogo
         this.score = 0;
@@ -56,16 +62,10 @@ export class SceneManager {
     _createScene() {
         const scene = new THREE.Scene();
 
-        // Cor de fundo (o "skybox" desta fase).
-        // Em vez de um skybox texturizado — que seria exagerado para um cenário
-        // noturno monocromático — usamos uma cor sólida preta. O efeito de
-        // "horizonte verde" típico do Battlezone será criado pelo nevoeiro.
         scene.background = new THREE.Color(CONFIG.COLORS.BACKGROUND);
 
-        // Nevoeiro linear: essencial para esconder os limites do plano de solo
-        // e criar a sensação de profundidade característica do jogo original.
         scene.fog = new THREE.Fog(
-            CONFIG.COLORS.HORIZON,  // Cor verde fosforescente no horizonte
+            CONFIG.COLORS.HORIZON,
             CONFIG.FOG.NEAR,
             CONFIG.FOG.FAR
         );

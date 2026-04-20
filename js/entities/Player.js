@@ -2,10 +2,11 @@ import * as THREE from 'three';
 import { CONFIG } from '../utils/Constants.js';
 
 export class Player {
-    constructor(scene, camera, inputHandler) {
-        this.scene = scene;
+    constructor(scene, camera, inputHandler, audio) {
+        this.scene  = scene;
         this.camera = camera;
-        this.input = inputHandler;
+        this.input  = inputHandler;
+        this.audio  = audio;
 
         this.projectiles = [];
         this._fireCooldown = 0;
@@ -18,8 +19,14 @@ export class Player {
 
     _createTank() {
         const group = new THREE.Group();
-        const bodyMat  = new THREE.MeshLambertMaterial({ color: CONFIG.TANK_COLORS.BODY });
-        const trackMat = new THREE.MeshLambertMaterial({ color: CONFIG.TANK_COLORS.TRACK });
+
+        // Textura de camuflagem carregada com TextureLoader (mesma abordagem do tutorial)
+        const tankTexture = new THREE.TextureLoader().load('./textures/tank.jpg');
+        tankTexture.wrapS = THREE.RepeatWrapping;
+        tankTexture.wrapT = THREE.RepeatWrapping;
+
+        const bodyMat  = new THREE.MeshLambertMaterial({ map: tankTexture });
+        const trackMat = new THREE.MeshLambertMaterial({ map: tankTexture });
 
         // Corpo principal
         const body = new THREE.Mesh(new THREE.BoxGeometry(4, 1.5, 6), bodyMat);
@@ -74,6 +81,7 @@ export class Player {
 
         this.scene.add(proj);
         this.projectiles.push(proj);
+        this.audio.playShoot();
     }
 
     _updateProjectiles(delta) {

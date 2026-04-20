@@ -9,13 +9,12 @@ export const CONFIG = {
     GROUND_SIZE: 2000,          // Largura/comprimento do plano de solo
     GROUND_SEGMENTS: 1,         // Plano plano não precisa de subdivisões; aumentar quando houver heightmap
 
-    // Cores estilo Battlezone original (paleta vetorial monocromática)
     COLORS: {
-        BACKGROUND: 0x000000,       // Preto absoluto
-        GROUND: 0x1a1a1a,           // Solo muito escuro
-        HORIZON: 0x00ff00,          // Verde fosforescente clássico — usado como cor do nevoeiro
-        AMBIENT_LIGHT: 0x404060,    // Luz ambiente azulada (noite)
-        MOON_LIGHT: 0xaabbff,       // Luz direcional simulando a lua
+        BACKGROUND:   0x000000,     // preto absoluto
+        GROUND:       0x1a1a1a,     // solo muito escuro
+        HORIZON:      0x00ff00,     // verde fosforescente — cor do nevoeiro
+        AMBIENT_LIGHT: 0x404060,    // luz ambiente azulada (noite)
+        MOON_LIGHT:   0xaabbff,     // luz direcional simulando a lua
     },
 
     // Câmara
