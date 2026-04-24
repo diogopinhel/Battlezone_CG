@@ -44,45 +44,50 @@ export class HUD {
         ctx.moveTo(cx, cy - r); ctx.lineTo(cx, cy + r);
         ctx.stroke();
 
-        // Bússola fixa — N sempre em cima independentemente da rotação do tanque
-        ctx.font         = 'bold 11px "Courier New"';
+        // Indicador de frente (topo do radar = direcao de marcha do jogador)
+        ctx.font         = 'bold 10px "Courier New"';
         ctx.textAlign    = 'center';
         ctx.textBaseline = 'middle';
-        ctx.fillStyle    = '#00ff00';
-        ctx.fillText('N', cx,         cy - r - 13);
-        ctx.fillText('S', cx,         cy + r + 13);
-        ctx.fillText('E', cx + r + 13, cy);
-        ctx.fillText('O', cx - r - 13, cy);
+        ctx.fillStyle    = 'rgba(0,255,0,0.5)';
+        ctx.fillText('▲', cx, cy - r - 11);
 
-        // Clip ao círculo para inimigos e jogador
+        ctx.fillStyle = 'rgba(0,255,0,0.7)';
+        ctx.fillText('N', cx, cy - r + 10);
+        ctx.fillText('S', cx, cy + r - 10);
+        ctx.fillText('E', cx + r - 10, cy);
+        ctx.fillText('O', cx - r + 10, cy);
+
+        // Clip ao círculo
         ctx.save();
         ctx.beginPath();
         ctx.arc(cx, cy, r - 2, 0, Math.PI * 2);
         ctx.clip();
 
-        // Inimigos — posição absoluta no mapa
-        // Three.js: +Z aponta para o espectador = Sul → negamos Z para N ficar em cima
+        // Radar rotativo centrado no jogador: frente do jogador (-Z local) = cima do radar.
+        const cosR = Math.cos(rotY);
+        const sinR = Math.sin(rotY);
+
         for (const enemy of enemies) {
-            const ex = cx + ( enemy.position.x / this._mapRange) * r;
-            const ey = cy + (-enemy.position.z / this._mapRange) * r;
+            const dx = enemy.position.x - playerPos.x;
+            const dz = enemy.position.z - playerPos.z;
+            const right = dx * cosR - dz * sinR;
+            const front = -dx * sinR - dz * cosR;
+            const ex = cx + right / this._mapRange * r;
+            const ey = cy - front / this._mapRange * r;
             ctx.beginPath();
             ctx.arc(ex, ey, 3, 0, Math.PI * 2);
             ctx.fillStyle = '#ff3333';
             ctx.fill();
         }
 
-        const px = cx + ( playerPos.x / this._mapRange) * r;
-        const py = cy + (-playerPos.z / this._mapRange) * r;
-
-        ctx.translate(px, py);
-        ctx.rotate(-rotY);
-
+        // Jogador sempre ao centro, triangulo sempre apontado para cima (= frente)
+        ctx.translate(cx, cy);
         ctx.fillStyle = '#00ff00';
         ctx.beginPath();
-        ctx.moveTo( 0,  -9);
-        ctx.lineTo(-4,   4);
-        ctx.lineTo( 0,   2);
-        ctx.lineTo( 4,   4);
+        ctx.moveTo( 0, -9);
+        ctx.lineTo(-4,  4);
+        ctx.lineTo( 0,  2);
+        ctx.lineTo( 4,  4);
         ctx.closePath();
         ctx.fill();
 

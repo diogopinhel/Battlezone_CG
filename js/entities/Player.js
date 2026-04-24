@@ -44,8 +44,8 @@ export class Player {
         const barrelMat = new THREE.MeshLambertMaterial({ map: tankTexture });
         const barrelGeo = new THREE.CylinderGeometry(0.18, 0.22, 3.5, 8);
         const barrel = new THREE.Mesh(barrelGeo, barrelMat);
-        barrel.rotation.x = Math.PI / 2;           // roda 90° para apontar em -Z
-        barrel.position.set(0, 2.1, -3.0);         // sai da frente da torreta
+        barrel.rotation.x = -Math.PI / 2;          // roda -90° para apontar em -Z (frente)
+        barrel.position.set(0, 2.1, -3.5);         // base alinhada com a frente da torreta
         barrel.castShadow = true;
         group.add(barrel);
 
@@ -61,9 +61,9 @@ export class Player {
 
     // Direção "em frente" do tanque em espaço mundo — fonte única de verdade
     _getForward() {
-        const dir = new THREE.Vector3();
-        this.tank.getWorldDirection(dir);
-        return dir;
+        return new THREE.Vector3(0, 0, -1)
+            .applyQuaternion(this.tank.quaternion)
+            .normalize();
     }
 
     _updateCamera() {

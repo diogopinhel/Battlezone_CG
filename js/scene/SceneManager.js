@@ -5,6 +5,7 @@ import { Lighting } from './Lighting.js';
 import { Environment } from './Environment.js';
 import { InputHandler } from '../input/InputHandler.js';
 import { Player } from '../entities/Player.js';
+import { Enemy } from '../entities/enemy.js';
 import { HUD } from '../ui/HUD.js';
 import { AudioManager } from '../audio/AudioManager.js';
 
@@ -47,7 +48,8 @@ export class SceneManager {
         // Estado do jogo
         this.score = 0;
         this.lives = 3;
-        this.enemies = []; // preenchido na Fase 3
+        this.enemies = [];
+        this._spawnEnemies();
 
         // HUD
         this.hud = new HUD();
@@ -118,6 +120,30 @@ export class SceneManager {
         this.renderer.setSize(window.innerWidth, window.innerHeight);
     }
 
+    _createEnemySpawnPosition() {
+        const halfMap = CONFIG.GROUND_SIZE / 2 - 80;
+        const playerPos = this.player.tank.position;
+        let position;
+
+        // Garante que os inimigos nao aparecem imediatamente em cima do jogador.
+        do {
+            position = new THREE.Vector3(
+                THREE.MathUtils.randFloatSpread(halfMap * 2),
+                0,
+                THREE.MathUtils.randFloatSpread(halfMap * 2)
+            );
+        } while (position.distanceTo(playerPos) < CONFIG.ENEMY.SPAWN_MIN_DISTANCE);
+
+        return position;
+    }
+
+    _spawnEnemies() {
+        for (let i = 0; i < CONFIG.ENEMY.COUNT; i++) {
+            const enemy = new Enemy(this.scene, this._createEnemySpawnPosition());
+            this.enemies.push(enemy);
+        }
+    }
+
     /**
      * Loop de animação principal. Usa requestAnimationFrame internamente
      * para sincronizar com o refresh rate do monitor (~60 FPS).
@@ -131,9 +157,71 @@ export class SceneManager {
         animate();
     }
 
+    _checkCollisions() {
+        const playerPos = this.player.tank.position;
+
+        // Projeteis do jogador contra inimigos
+        for (let i = this.player.projectiles.length - 1; i >= 0; i--) {
+            const proj = this.player.projectiles[i];
+            let hit = false;
+            for (let j = this.enemies.length - 1; j >= 0; j--) {
+                const enemy = this.enemies[j];
+                if (!enemy.alive) continue;
+                if (proj.position.distanceTo(enemy.position) < CONFIG.ENEMY.HIT_RADIUS) {
+                    const result = enemy.takeDamage(1);
+                    if (result === 'dead') {
+                        this.score++;
+                        this.audio.playDestroy();
+                    } else {
+                        this.audio.playHit();
+                    }
+                    hit = true;
+                    break;
+                }
+            }
+            if (hit) {
+                this.scene.remove(proj);
+                this.player.projectiles.splice(i, 1);
+            }
+        }
+
+        // Projeteis dos inimigos contra o jogador
+        for (const enemy of this.enemies) {
+            if (!enemy.alive) continue;
+            for (let i = enemy.projectiles.length - 1; i >= 0; i--) {
+                const proj = enemy.projectiles[i];
+                if (proj.position.distanceTo(playerPos) < CONFIG.ENEMY.PROJECTILE_HIT_RADIUS) {
+                    this.scene.remove(proj);
+                    enemy.projectiles.splice(i, 1);
+                    this.lives = Math.max(0, this.lives - 1);
+                }
+            }
+        }
+
+        // Colisao fisica tank do jogador contra tanks inimigos
+        for (const enemy of this.enemies) {
+            if (!enemy.alive) continue;
+            const dist = playerPos.distanceTo(enemy.position);
+            if (dist > 0 && dist < CONFIG.ENEMY.BODY_RADIUS) {
+                const pushDir = playerPos.clone().sub(enemy.position).normalize();
+                this.player.tank.position.addScaledVector(pushDir, CONFIG.ENEMY.BODY_RADIUS - dist);
+            }
+        }
+
+        // Remove inimigos destruidos da lista
+        this.enemies = this.enemies.filter(e => e.alive);
+    }
+
     _update() {
         const delta = this.clock.getDelta();
         this.player.update(delta);
+
+        for (const enemy of this.enemies) {
+            enemy.update(delta, this.player);
+        }
+
+        this._checkCollisions();
+
         this.hud.update(
             this.player.tank.position,
             this.player.tank.rotation.y,
