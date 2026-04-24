@@ -7,6 +7,9 @@
     <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
+    <!-- Botão fullscreen -->
+    <button id="btn-fullscreen" title="Fullscreen (F)">⛶</button>
+
     <!-- HUD sobreposto ao canvas -->
     <div id="hud">
         <!-- Canto superior esquerdo: vidas e score -->
@@ -32,5 +35,20 @@
     </script>
 
     <script type="module" src="js/main.js"></script>
+    <script>
+        function toggleFullscreen() {
+            if (!document.fullscreenElement) {
+                document.documentElement.requestFullscreen();
+            } else {
+                document.exitFullscreen();
+            }
+        }
+
+        document.getElementById('btn-fullscreen').addEventListener('click', toggleFullscreen);
+
+        document.addEventListener('keydown', e => {
+            if (e.code === 'KeyF') toggleFullscreen();
+        });
+    </script>
 </body>
 </html>

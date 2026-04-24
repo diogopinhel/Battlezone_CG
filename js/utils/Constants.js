@@ -19,7 +19,7 @@ export const CONFIG = {
 
     // Câmara
     CAMERA: {
-        FOV: 70,
+        FOV: 90,
         NEAR: 0.5,                  // 0.5 permite ver o canhão sem Z-fighting relevante (far/near = 4000)
         FAR: 2000,                  // Fog termina em 1500; FAR de 2000 é suficiente e preserva precisão do depth buffer
         INITIAL_POSITION: { x: 0, y: 15, z: 50 },

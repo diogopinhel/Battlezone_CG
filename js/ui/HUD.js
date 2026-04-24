@@ -75,7 +75,7 @@ export class HUD {
         const py = cy + (-playerPos.z / this._mapRange) * r;
 
         ctx.translate(px, py);
-        ctx.rotate(rotY);
+        ctx.rotate(-rotY);
 
         ctx.fillStyle = '#00ff00';
         ctx.beginPath();

@@ -40,6 +40,15 @@ export class Player {
         turret.castShadow = true;
         group.add(turret);
 
+        // Cano do canhão — cilindro apontado para a frente (-Z), fixo à torreta
+        const barrelMat = new THREE.MeshLambertMaterial({ map: tankTexture });
+        const barrelGeo = new THREE.CylinderGeometry(0.18, 0.22, 3.5, 8);
+        const barrel = new THREE.Mesh(barrelGeo, barrelMat);
+        barrel.rotation.x = Math.PI / 2;           // roda 90° para apontar em -Z
+        barrel.position.set(0, 2.1, -3.0);         // sai da frente da torreta
+        barrel.castShadow = true;
+        group.add(barrel);
+
         // Lagartas (esquerda e direita)
         for (const x of [-2.2, 2.2]) {
             const track = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 6.5), trackMat);

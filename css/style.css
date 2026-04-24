@@ -52,6 +52,30 @@ html, body {
     text-shadow: 0 0 8px #00ff00;
 }
 
+/* Botão fullscreen */
+#btn-fullscreen {
+    position: fixed;
+    bottom: 14px;
+    right: 14px;
+    z-index: 20;
+    background: rgba(0, 20, 0, 0.75);
+    color: #00ff00;
+    border: 1px solid #00ff00;
+    font-size: 20px;
+    width: 36px;
+    height: 36px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0.6;
+    transition: opacity 0.2s;
+}
+
+#btn-fullscreen:hover {
+    opacity: 1;
+}
+
 /* Canto superior direito: radar */
 #hud-radar {
     position: absolute;
