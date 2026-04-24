@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { CONFIG } from '../utils/Constants.js';
 
-const ENEMY_STATE = {
+const Enemy_STATE = {
     PATROL: 'PATROL',
     CHASE: 'CHASE',
     ATTACK: 'ATTACK',
@@ -10,11 +10,11 @@ const ENEMY_STATE = {
 export class Enemy {
     constructor(scene, position = new THREE.Vector3()) {
         this.scene = scene;
-        this.state = ENEMY_STATE.PATROL;
-        this.health = CONFIG.ENEMY.HEALTH;
+        this.state = Enemy_STATE.PATROL;
+        this.health = CONFIG.Enemy.HEALTH;
         this.alive = true;
         this.projectiles = [];
-        this._fireCooldown = CONFIG.ENEMY.FIRE_COOLDOWN;
+        this._fireCooldown = CONFIG.Enemy.FIRE_COOLDOWN;
         this._patrolTarget = this._createPatrolTarget();
         this._alerted = false;  // fica true ao receber dano, nunca volta ao patrol
         this._bodyMat = null;
@@ -69,7 +69,7 @@ export class Enemy {
 
     // Atualiza o brilho do material sem desenhar uma caixa visual em volta do tanque.
     _updateVisuals() {
-        if (this.state === ENEMY_STATE.ATTACK) {
+        if (this.state === Enemy_STATE.ATTACK) {
             this._bodyMat.emissive.setHex(0x550000);
             this._bodyMat.emissiveIntensity = 0.4;
         } else {
@@ -100,13 +100,13 @@ export class Enemy {
     _updateState(player) {
         const dist = this.position.distanceTo(this._getPlayerPosition(player));
 
-        if (dist <= CONFIG.ENEMY.ATTACK_RANGE) {
-            this.state = ENEMY_STATE.ATTACK;
-        } else if (this._alerted || dist <= CONFIG.ENEMY.DETECTION_RANGE) {
+        if (dist <= CONFIG.Enemy.ATTACK_RANGE) {
+            this.state = Enemy_STATE.ATTACK;
+        } else if (this._alerted || dist <= CONFIG.Enemy.DETECTION_RANGE) {
             // Ao ser alertado (por dano recebido), nunca volta ao patrol
-            this.state = ENEMY_STATE.CHASE;
+            this.state = Enemy_STATE.CHASE;
         } else {
-            this.state = ENEMY_STATE.PATROL;
+            this.state = Enemy_STATE.PATROL;
         }
     }
 
@@ -123,13 +123,13 @@ export class Enemy {
             Math.PI * 2
         ) - Math.PI;
 
-        const maxTurn = CONFIG.ENEMY.ROTATE_SPEED * delta;
+        const maxTurn = CONFIG.Enemy.ROTATE_SPEED * delta;
         this.tank.rotation.y += THREE.MathUtils.clamp(angleDiff, -maxTurn, maxTurn);
     }
 
     _moveForward(delta, speedScale = 1) {
         const forward = this._getForward();
-        const speed = CONFIG.ENEMY.MOVE_SPEED * speedScale;
+        const speed = CONFIG.Enemy.MOVE_SPEED * speedScale;
         const halfMap = CONFIG.GROUND_SIZE / 2 - 10;
 
         this.position.addScaledVector(forward, speed * delta);
@@ -154,7 +154,7 @@ export class Enemy {
         proj.position.copy(this.position).addScaledVector(dir, 7);
         proj.position.y = 2.5;
 
-        proj.userData.velocity = dir.clone().multiplyScalar(CONFIG.ENEMY.PROJECTILE_SPEED);
+        proj.userData.velocity = dir.clone().multiplyScalar(CONFIG.Enemy.PROJECTILE_SPEED);
         proj.userData.distanceTraveled = 0;
 
         this.scene.add(proj);
@@ -164,12 +164,12 @@ export class Enemy {
     _tryShootAt(target) {
         const distance = this.position.distanceTo(target);
         if (
-            distance <= CONFIG.ENEMY.SHOOT_RANGE &&
-            this._getFacingDot(target) >= CONFIG.ENEMY.SHOOT_ALIGNMENT &&
+            distance <= CONFIG.Enemy.SHOOT_RANGE &&
+            this._getFacingDot(target) >= CONFIG.Enemy.SHOOT_ALIGNMENT &&
             this._fireCooldown <= 0
         ) {
             this._shoot();
-            this._fireCooldown = CONFIG.ENEMY.FIRE_COOLDOWN;
+            this._fireCooldown = CONFIG.Enemy.FIRE_COOLDOWN;
         }
     }
 
@@ -180,7 +180,7 @@ export class Enemy {
             p.position.add(step);
             p.userData.distanceTraveled += step.length();
 
-            if (p.userData.distanceTraveled > CONFIG.ENEMY.PROJECTILE_MAX_DIST) {
+            if (p.userData.distanceTraveled > CONFIG.Enemy.PROJECTILE_MAX_DIST) {
                 this.scene.remove(p);
                 this.projectiles.splice(i, 1);
             }
@@ -188,7 +188,7 @@ export class Enemy {
     }
 
     _updatePatrol(delta) {
-        if (this.position.distanceTo(this._patrolTarget) <= CONFIG.ENEMY.PATROL_REACH_DISTANCE) {
+        if (this.position.distanceTo(this._patrolTarget) <= CONFIG.Enemy.PATROL_REACH_DISTANCE) {
             this._patrolTarget = this._createPatrolTarget();
         }
         this._rotateToward(this._patrolTarget, delta);
@@ -199,7 +199,7 @@ export class Enemy {
         const playerPos = this._getPlayerPosition(player);
         this._rotateToward(playerPos, delta);
 
-        if (this._getFacingDot(playerPos) > CONFIG.ENEMY.CHASE_MOVE_ALIGNMENT) {
+        if (this._getFacingDot(playerPos) > CONFIG.Enemy.CHASE_MOVE_ALIGNMENT) {
             this._moveForward(delta);
         }
 
@@ -220,9 +220,9 @@ export class Enemy {
         this._updateProjectiles(delta);
         this._fireCooldown = Math.max(0, this._fireCooldown - delta);
 
-        if (this.state === ENEMY_STATE.CHASE) {
+        if (this.state === Enemy_STATE.CHASE) {
             this._updateChase(delta, player);
-        } else if (this.state === ENEMY_STATE.ATTACK) {
+        } else if (this.state === Enemy_STATE.ATTACK) {
             this._updateAttack(delta, player);
         } else {
             this._updatePatrol(delta);

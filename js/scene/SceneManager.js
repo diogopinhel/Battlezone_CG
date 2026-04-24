@@ -5,7 +5,7 @@ import { Lighting } from './Lighting.js';
 import { Environment } from './Environment.js';
 import { InputHandler } from '../input/InputHandler.js';
 import { Player } from '../entities/Player.js';
-import { Enemy } from '../entities/enemy.js';
+import { Enemy } from '../entities/Enemy.js';
 import { HUD } from '../ui/HUD.js';
 import { AudioManager } from '../audio/AudioManager.js';
 
@@ -132,15 +132,15 @@ export class SceneManager {
                 0,
                 THREE.MathUtils.randFloatSpread(halfMap * 2)
             );
-        } while (position.distanceTo(playerPos) < CONFIG.ENEMY.SPAWN_MIN_DISTANCE);
+        } while (position.distanceTo(playerPos) < CONFIG.Enemy.SPAWN_MIN_DISTANCE);
 
         return position;
     }
 
     _spawnEnemies() {
-        for (let i = 0; i < CONFIG.ENEMY.COUNT; i++) {
-            const enemy = new Enemy(this.scene, this._createEnemySpawnPosition());
-            this.enemies.push(enemy);
+        for (let i = 0; i < CONFIG.Enemy.COUNT; i++) {
+            const Enemy = new Enemy(this.scene, this._createEnemySpawnPosition());
+            this.enemies.push(Enemy);
         }
     }
 
@@ -165,10 +165,10 @@ export class SceneManager {
             const proj = this.player.projectiles[i];
             let hit = false;
             for (let j = this.enemies.length - 1; j >= 0; j--) {
-                const enemy = this.enemies[j];
-                if (!enemy.alive) continue;
-                if (proj.position.distanceTo(enemy.position) < CONFIG.ENEMY.HIT_RADIUS) {
-                    const result = enemy.takeDamage(1);
+                const Enemy = this.enemies[j];
+                if (!Enemy.alive) continue;
+                if (proj.position.distanceTo(Enemy.position) < CONFIG.Enemy.HIT_RADIUS) {
+                    const result = Enemy.takeDamage(1);
                     if (result === 'dead') {
                         this.score++;
                         this.audio.playDestroy();
@@ -186,25 +186,25 @@ export class SceneManager {
         }
 
         // Projeteis dos inimigos contra o jogador
-        for (const enemy of this.enemies) {
-            if (!enemy.alive) continue;
-            for (let i = enemy.projectiles.length - 1; i >= 0; i--) {
-                const proj = enemy.projectiles[i];
-                if (proj.position.distanceTo(playerPos) < CONFIG.ENEMY.PROJECTILE_HIT_RADIUS) {
+        for (const Enemy of this.enemies) {
+            if (!Enemy.alive) continue;
+            for (let i = Enemy.projectiles.length - 1; i >= 0; i--) {
+                const proj = Enemy.projectiles[i];
+                if (proj.position.distanceTo(playerPos) < CONFIG.Enemy.PROJECTILE_HIT_RADIUS) {
                     this.scene.remove(proj);
-                    enemy.projectiles.splice(i, 1);
+                    Enemy.projectiles.splice(i, 1);
                     this.lives = Math.max(0, this.lives - 1);
                 }
             }
         }
 
         // Colisao fisica tank do jogador contra tanks inimigos
-        for (const enemy of this.enemies) {
-            if (!enemy.alive) continue;
-            const dist = playerPos.distanceTo(enemy.position);
-            if (dist > 0 && dist < CONFIG.ENEMY.BODY_RADIUS) {
-                const pushDir = playerPos.clone().sub(enemy.position).normalize();
-                this.player.tank.position.addScaledVector(pushDir, CONFIG.ENEMY.BODY_RADIUS - dist);
+        for (const Enemy of this.enemies) {
+            if (!Enemy.alive) continue;
+            const dist = playerPos.distanceTo(Enemy.position);
+            if (dist > 0 && dist < CONFIG.Enemy.BODY_RADIUS) {
+                const pushDir = playerPos.clone().sub(Enemy.position).normalize();
+                this.player.tank.position.addScaledVector(pushDir, CONFIG.Enemy.BODY_RADIUS - dist);
             }
         }
 
@@ -216,8 +216,8 @@ export class SceneManager {
         const delta = this.clock.getDelta();
         this.player.update(delta);
 
-        for (const enemy of this.enemies) {
-            enemy.update(delta, this.player);
+        for (const Enemy of this.enemies) {
+            Enemy.update(delta, this.player);
         }
 
         this._checkCollisions();

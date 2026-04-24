@@ -67,9 +67,9 @@ export class HUD {
         const cosR = Math.cos(rotY);
         const sinR = Math.sin(rotY);
 
-        for (const enemy of enemies) {
-            const dx = enemy.position.x - playerPos.x;
-            const dz = enemy.position.z - playerPos.z;
+        for (const Enemy of enemies) {
+            const dx = Enemy.position.x - playerPos.x;
+            const dz = Enemy.position.z - playerPos.z;
             const right = dx * cosR - dz * sinR;
             const front = -dx * sinR - dz * cosR;
             const ex = cx + right / this._mapRange * r;

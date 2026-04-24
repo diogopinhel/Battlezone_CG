@@ -48,7 +48,7 @@ export const CONFIG = {
     },
 
     // Inimigos / tanques controlados por IA
-    ENEMY: {
+    Enemy: {
         COUNT: 4,                       // numero inicial de inimigos no mapa
         MOVE_SPEED: 6,                  // unidades por segundo
         ROTATE_SPEED: 1.8,              // radianos por segundo
