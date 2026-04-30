@@ -44,14 +44,11 @@ export class HUD {
         ctx.moveTo(cx, cy - r); ctx.lineTo(cx, cy + r);
         ctx.stroke();
 
-        // Indicador de frente (topo do radar = direcao de marcha do jogador)
+        // Pontos cardeais — fixos porque o mapa é world-fixed (N = -Z = topo)
         ctx.font         = 'bold 10px "Courier New"';
         ctx.textAlign    = 'center';
         ctx.textBaseline = 'middle';
-        ctx.fillStyle    = 'rgba(0,255,0,0.5)';
-        ctx.fillText('▲', cx, cy - r - 11);
-
-        ctx.fillStyle = 'rgba(0,255,0,0.7)';
+        ctx.fillStyle    = 'rgba(0,255,0,0.7)';
         ctx.fillText('N', cx, cy - r + 10);
         ctx.fillText('S', cx, cy + r - 10);
         ctx.fillText('E', cx + r - 10, cy);
@@ -63,33 +60,33 @@ export class HUD {
         ctx.arc(cx, cy, r - 2, 0, Math.PI * 2);
         ctx.clip();
 
-        // Radar rotativo centrado no jogador: frente do jogador (-Z local) = cima do radar.
-        const cosR = Math.cos(rotY);
-        const sinR = Math.sin(rotY);
-
-        for (const Enemy of enemies) {
-            const dx = Enemy.position.x - playerPos.x;
-            const dz = Enemy.position.z - playerPos.z;
-            const right = dx * cosR - dz * sinR;
-            const front = -dx * sinR - dz * cosR;
-            const ex = cx + right / this._mapRange * r;
-            const ey = cy - front / this._mapRange * r;
+        // Inimigos — posição no mundo → posição no radar
+        // +X mundo = direita; +Z mundo = sul (baixo no canvas)
+        for (const enemy of enemies) {
+            const ex = cx + enemy.position.x / this._mapRange * r;
+            const ey = cy + enemy.position.z / this._mapRange * r;
             ctx.beginPath();
             ctx.arc(ex, ey, 3, 0, Math.PI * 2);
             ctx.fillStyle = '#ff3333';
             ctx.fill();
         }
 
-        // Jogador sempre ao centro, triangulo sempre apontado para cima (= frente)
-        ctx.translate(cx, cy);
+        // Jogador — move-se pelo radar, triangulo roda com a orientação do tanque
+        const px = cx + playerPos.x / this._mapRange * r;
+        const py = cy + playerPos.z / this._mapRange * r;
+
+        ctx.save();
+        ctx.translate(px, py);
+        ctx.rotate(-rotY);   // -rotY: Three.js usa CCW; canvas usa CW
         ctx.fillStyle = '#00ff00';
         ctx.beginPath();
-        ctx.moveTo( 0, -9);
+        ctx.moveTo( 0, -9);   // ponta (frente)
         ctx.lineTo(-4,  4);
         ctx.lineTo( 0,  2);
         ctx.lineTo( 4,  4);
         ctx.closePath();
         ctx.fill();
+        ctx.restore();
 
         ctx.restore();
     }

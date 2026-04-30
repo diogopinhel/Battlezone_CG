@@ -45,6 +45,7 @@ export const CONFIG = {
         FIRE_COOLDOWN: 0.5,         // segundos minimos entre disparos
         PROJECTILE_SPEED: 150,      // unidades por segundo
         PROJECTILE_MAX_DIST: 800,   // distancia maxima antes de desaparecer
+        MAX_LIVES: 5,               // teto de vidas acumulaveis
     },
 
     // Inimigos / tanques controlados por IA
@@ -59,7 +60,7 @@ export const CONFIG = {
         SHOOT_ALIGNMENT: 0.85,          // exige estar quase apontado ao jogador antes de disparar
         PATROL_REACH_DISTANCE: 12,      // margem para considerar um ponto atingido
         SPAWN_MIN_DISTANCE: 70,         // evita criar inimigos demasiado perto do jogador
-        HEALTH: 2,
+        HEALTH: 3,
         FIRE_COOLDOWN: 3.0,             // segundos entre disparos do inimigo
         PROJECTILE_SPEED: 60,           // unidades por segundo
         PROJECTILE_MAX_DIST: 350,       // distancia maxima do projetil inimigo
@@ -70,6 +71,6 @@ export const CONFIG = {
 
     // Radar / minimapa
     RADAR: {
-        RANGE: 500,   // unidades do mundo que cabem no raio do radar
+        RANGE: 1000,  // mostra o mapa completo (ground = 2000×2000, half = 1000)
     },
 };

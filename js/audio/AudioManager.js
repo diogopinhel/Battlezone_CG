@@ -67,6 +67,26 @@ export class AudioManager {
         source.start(now);
     }
 
+    // Arpejo ascendente ao apanhar uma vida (C5 → E5 → G5)
+    playPickup() {
+        const ctx = this._getCtx();
+        const now = ctx.currentTime;
+
+        [523, 659, 784].forEach((freq, i) => {
+            const t    = now + i * 0.09;
+            const osc  = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.type = 'square';
+            osc.frequency.setValueAtTime(freq, t);
+            gain.gain.setValueAtTime(0.14, t);
+            gain.gain.exponentialRampToValueAtTime(0.001, t + 0.13);
+            osc.start(t);
+            osc.stop(t + 0.13);
+        });
+    }
+
     // Som de destruicao de inimigo: explosao com grave e ruido
     playDestroy() {
         const ctx      = this._getCtx();

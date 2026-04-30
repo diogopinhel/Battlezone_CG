@@ -7,9 +7,12 @@
     <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
-    
+
     <!-- Botão fullscreen -->
     <button id="btn-fullscreen" title="Fullscreen (F)">⛶</button>
+
+    <!-- Mira central -->
+    <div id="crosshair"></div>
 
     <!-- HUD sobreposto ao canvas -->
     <div id="hud">
@@ -21,6 +24,14 @@
 
         <!-- Canto superior direito: radar -->
         <canvas id="hud-radar" width="200" height="200"></canvas>
+    </div>
+
+    <!-- Ecrã de Game Over -->
+    <div id="game-over">
+        <h1>GAME OVER</h1>
+        <p id="go-score">PONTUAÇÃO: 000000</p>
+        <p id="go-highscore">RECORDE:   000000</p>
+        <button id="go-restart">JOGAR DE NOVO</button>
     </div>
 
     <!-- Canvas onde o Three.js desenha a cena -->
@@ -35,7 +46,6 @@
     }
     </script>
 
-    //Script para o modo de tela cheia e para o atalho de teclado 'F'
     <script type="module" src="js/main.js"></script>
     <script>
         function toggleFullscreen() {
@@ -51,6 +61,8 @@
         document.addEventListener('keydown', e => {
             if (e.code === 'KeyF') toggleFullscreen();
         });
+
+        document.getElementById('go-restart').addEventListener('click', () => location.reload());
     </script>
 </body>
 </html>

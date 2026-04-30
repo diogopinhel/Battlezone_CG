@@ -6,6 +6,8 @@ import { Environment } from './Environment.js';
 import { InputHandler } from '../input/InputHandler.js';
 import { Player } from '../entities/Player.js';
 import { Enemy } from '../entities/Enemy.js';
+import { Wreck } from '../entities/Wreck.js';
+import { LifePickup } from '../entities/LifePickup.js';
 import { HUD } from '../ui/HUD.js';
 import { AudioManager } from '../audio/AudioManager.js';
 
@@ -48,11 +50,17 @@ export class SceneManager {
         // Estado do jogo
         this.score = 0;
         this.lives = 3;
-        this.enemies = [];
+        this.enemies     = [];
+        this.wrecks      = [];
+        this.lifePickups = [];
         this._spawnEnemies();
+        this._spawnLifePickups();
 
         // HUD
         this.hud = new HUD();
+
+        // Estado de game over
+        this._gameOver = false;
 
         // Clock para calcular delta time correto por frame
         this.clock = new THREE.Clock();
@@ -139,8 +147,22 @@ export class SceneManager {
 
     _spawnEnemies() {
         for (let i = 0; i < CONFIG.Enemy.COUNT; i++) {
-            const Enemy = new Enemy(this.scene, this._createEnemySpawnPosition());
-            this.enemies.push(Enemy);
+            const enemy = new Enemy(this.scene, this._createEnemySpawnPosition());
+            this.enemies.push(enemy);
+        }
+    }
+
+    _spawnLifePickups() {
+        const count = 2;
+        for (let i = 0; i < count; i++) {
+            const angle = (i / count) * Math.PI * 2 + Math.random() * Math.PI;
+            const dist  = 90 + Math.random() * 140;
+            const pos   = new THREE.Vector3(
+                Math.cos(angle) * dist,
+                0,
+                Math.sin(angle) * dist
+            );
+            this.lifePickups.push(new LifePickup(this.scene, pos));
         }
     }
 
@@ -165,13 +187,14 @@ export class SceneManager {
             const proj = this.player.projectiles[i];
             let hit = false;
             for (let j = this.enemies.length - 1; j >= 0; j--) {
-                const Enemy = this.enemies[j];
-                if (!Enemy.alive) continue;
-                if (proj.position.distanceTo(Enemy.position) < CONFIG.Enemy.HIT_RADIUS) {
-                    const result = Enemy.takeDamage(1);
+                const enemy = this.enemies[j];
+                if (!enemy.alive) continue;
+                if (proj.position.distanceTo(enemy.position) < CONFIG.Enemy.HIT_RADIUS) {
+                    const result = enemy.takeDamage(1);
                     if (result === 'dead') {
                         this.score++;
                         this.audio.playDestroy();
+                        this.wrecks.push(new Wreck(this.scene, enemy.position.clone()));
                     } else {
                         this.audio.playHit();
                     }
@@ -186,25 +209,67 @@ export class SceneManager {
         }
 
         // Projeteis dos inimigos contra o jogador
-        for (const Enemy of this.enemies) {
-            if (!Enemy.alive) continue;
-            for (let i = Enemy.projectiles.length - 1; i >= 0; i--) {
-                const proj = Enemy.projectiles[i];
+        for (const enemy of this.enemies) {
+            if (!enemy.alive) continue;
+            for (let i = enemy.projectiles.length - 1; i >= 0; i--) {
+                const proj = enemy.projectiles[i];
                 if (proj.position.distanceTo(playerPos) < CONFIG.Enemy.PROJECTILE_HIT_RADIUS) {
                     this.scene.remove(proj);
-                    Enemy.projectiles.splice(i, 1);
+                    enemy.projectiles.splice(i, 1);
                     this.lives = Math.max(0, this.lives - 1);
                 }
             }
         }
 
         // Colisao fisica tank do jogador contra tanks inimigos
-        for (const Enemy of this.enemies) {
-            if (!Enemy.alive) continue;
-            const dist = playerPos.distanceTo(Enemy.position);
+        for (const enemy of this.enemies) {
+            if (!enemy.alive) continue;
+            const dist = playerPos.distanceTo(enemy.position);
             if (dist > 0 && dist < CONFIG.Enemy.BODY_RADIUS) {
-                const pushDir = playerPos.clone().sub(Enemy.position).normalize();
+                const pushDir = playerPos.clone().sub(enemy.position).normalize();
                 this.player.tank.position.addScaledVector(pushDir, CONFIG.Enemy.BODY_RADIUS - dist);
+            }
+        }
+
+        // Projeteis contra obstaculos estaticos (pedras e arvores)
+        const colliders = this.environment.colliders;
+
+        for (let i = this.player.projectiles.length - 1; i >= 0; i--) {
+            const proj = this.player.projectiles[i];
+            for (const col of colliders) {
+                const dx = proj.position.x - col.x;
+                const dz = proj.position.z - col.z;
+                if (dx * dx + dz * dz < col.radius * col.radius) {
+                    this.scene.remove(proj);
+                    this.player.projectiles.splice(i, 1);
+                    break;
+                }
+            }
+        }
+
+        for (const enemy of this.enemies) {
+            if (!enemy.alive) continue;
+            for (let i = enemy.projectiles.length - 1; i >= 0; i--) {
+                const proj = enemy.projectiles[i];
+                for (const col of colliders) {
+                    const dx = proj.position.x - col.x;
+                    const dz = proj.position.z - col.z;
+                    if (dx * dx + dz * dz < col.radius * col.radius) {
+                        this.scene.remove(proj);
+                        enemy.projectiles.splice(i, 1);
+                        break;
+                    }
+                }
+            }
+        }
+
+        // Vidas no mapa — jogador passa por cima para apanhar
+        for (let i = this.lifePickups.length - 1; i >= 0; i--) {
+            if (this.lifePickups[i].checkCollect(this.player.tank.position)) {
+                this.lifePickups[i].collect();
+                this.lifePickups.splice(i, 1);
+                if (this.lives < CONFIG.PLAYER.MAX_LIVES) this.lives++;
+                this.audio.playPickup();
             }
         }
 
@@ -212,15 +277,55 @@ export class SceneManager {
         this.enemies = this.enemies.filter(e => e.alive);
     }
 
+    _showGameOver() {
+        this._gameOver = true;
+        const key = 'battlezone_highscore';
+        const hs   = parseInt(localStorage.getItem(key) || '0', 10);
+        if (this.score > hs) localStorage.setItem(key, String(this.score));
+        const best = Math.max(this.score, hs);
+
+        document.getElementById('go-score').textContent     = `PONTUAÇÃO: ${String(this.score).padStart(6, '0')}`;
+        document.getElementById('go-highscore').textContent = `RECORDE:   ${String(best).padStart(6, '0')}`;
+        document.getElementById('game-over').style.display  = 'flex';
+    }
+
+    _resolveStaticCollisions(tankPos, tankRadius = 3) {
+        for (const col of this.environment.colliders) {
+            const dx = tankPos.x - col.x;
+            const dz = tankPos.z - col.z;
+            const distSq = dx * dx + dz * dz;
+            const minDist = col.radius + tankRadius;
+            if (distSq > 0 && distSq < minDist * minDist) {
+                const dist = Math.sqrt(distSq);
+                tankPos.x += (dx / dist) * (minDist - dist);
+                tankPos.z += (dz / dist) * (minDist - dist);
+            }
+        }
+    }
+
     _update() {
+        if (this._gameOver) return;
+
         const delta = this.clock.getDelta();
         this.player.update(delta);
+        this._resolveStaticCollisions(this.player.tank.position);
 
-        for (const Enemy of this.enemies) {
-            Enemy.update(delta, this.player);
+        for (const enemy of this.enemies) {
+            enemy.update(delta, this.player, this.environment.colliders);
+            if (enemy.alive) this._resolveStaticCollisions(enemy.position);
         }
 
         this._checkCollisions();
+
+        for (const wreck of this.wrecks) wreck.update(delta);
+        this.wrecks = this.wrecks.filter(w => w.alive);
+
+        for (const pickup of this.lifePickups) pickup.update(delta);
+
+        if (this.lives <= 0) {
+            this._showGameOver();
+            return;
+        }
 
         this.hud.update(
             this.player.tank.position,

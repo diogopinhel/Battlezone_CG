@@ -5,9 +5,11 @@ const GREEN = 0x00ff00;
 export class Environment {
     constructor() {
         this.group = new THREE.Group();
+        this.colliders = [];    // { x, z, radius } — usado para colisão com tanques
         this._addStars();
         this._addMoon();
         this._addTrees();
+        this._addRocks();
     }
 
     // ── Stars ─────────────────────────────────────────────────────────────────
@@ -98,12 +100,66 @@ export class Environment {
             const scale = 0.7 + Math.random() * 1.0;
 
             const tree = this._makeTree(scale);
-            tree.position.set(
-                Math.cos(angle) * dist,
-                0,
-                Math.sin(angle) * dist
-            );
+            const x = Math.cos(angle) * dist;
+            const z = Math.sin(angle) * dist;
+            tree.position.set(x, 0, z);
             this.group.add(tree);
+
+            this.colliders.push({ x, z, radius: 3 });
+        }
+    }
+
+    // ── Rocks ─────────────────────────────────────────────────────────────────
+
+    _makeRock(scale) {
+        const group = new THREE.Group();
+        const mat   = new THREE.LineBasicMaterial({ color: GREEN });
+
+        // Pedra principal
+        const main = new THREE.LineSegments(
+            new THREE.EdgesGeometry(new THREE.BoxGeometry(4, 2.2, 3)),
+            mat
+        );
+        main.position.y = 1.1;
+        main.rotation.y = Math.random() * Math.PI;
+        group.add(main);
+
+        // Pedra secundária deslocada
+        const sec = new THREE.LineSegments(
+            new THREE.EdgesGeometry(new THREE.BoxGeometry(2.5, 1.6, 2)),
+            mat
+        );
+        sec.position.set(2.2, 0.8, 1);
+        sec.rotation.y = Math.random() * Math.PI;
+        group.add(sec);
+
+        // Topo angular (octaedro para variedade visual)
+        const cap = new THREE.LineSegments(
+            new THREE.EdgesGeometry(new THREE.OctahedronGeometry(1.2)),
+            mat
+        );
+        cap.position.set(-1.2, 2.6, -0.4);
+        group.add(cap);
+
+        group.scale.setScalar(scale);
+        return group;
+    }
+
+    _addRocks() {
+        const count = 25;
+        for (let i = 0; i < count; i++) {
+            const angle = Math.random() * Math.PI * 2;
+            const dist  = 80 + Math.random() * 200;   // interior do mapa de jogo
+            const scale = 0.8 + Math.random() * 0.8;  // 0.8 – 1.6
+
+            const rock = this._makeRock(scale);
+            const x = Math.cos(angle) * dist;
+            const z = Math.sin(angle) * dist;
+            rock.position.set(x, 0, z);
+            rock.rotation.y = Math.random() * Math.PI * 2;
+            this.group.add(rock);
+
+            this.colliders.push({ x, z, radius: 5 * scale });
         }
     }
 

@@ -82,3 +82,98 @@ html, body {
     top: 10px;
     right: 10px;
 }
+
+/* ── Mira central ─────────────────────────────────────────────────────────── */
+
+#crosshair {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    width: 20px;
+    height: 20px;
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+    z-index: 10;
+}
+
+#crosshair::before,
+#crosshair::after {
+    content: '';
+    position: absolute;
+    background: rgba(0, 255, 0, 0.75);
+    box-shadow: 0 0 4px rgba(0, 255, 0, 0.5);
+}
+
+/* barra horizontal */
+#crosshair::before {
+    width: 20px;
+    height: 2px;
+    top: 50%;
+    left: 0;
+    transform: translateY(-50%);
+}
+
+/* barra vertical */
+#crosshair::after {
+    width: 2px;
+    height: 20px;
+    left: 50%;
+    top: 0;
+    transform: translateX(-50%);
+}
+
+/* ── Ecrã de Game Over ────────────────────────────────────────────────────── */
+
+#game-over {
+    display: none;          /* mostrado via JS quando lives = 0 */
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.90);
+    z-index: 300;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 22px;
+}
+
+#game-over h1 {
+    font-size: 64px;
+    letter-spacing: 10px;
+    text-transform: uppercase;
+    text-shadow: 0 0 24px #00ff00, 0 0 60px #00ff00;
+    animation: go-flicker 2.5s infinite;
+}
+
+#game-over p {
+    font-size: 20px;
+    letter-spacing: 4px;
+    text-shadow: 0 0 8px #00ff00;
+}
+
+#go-restart {
+    margin-top: 16px;
+    background: transparent;
+    color: #00ff00;
+    border: 2px solid #00ff00;
+    font-family: 'Courier New', monospace;
+    font-size: 18px;
+    letter-spacing: 4px;
+    padding: 12px 36px;
+    cursor: pointer;
+    pointer-events: all;
+    text-shadow: 0 0 8px #00ff00;
+    box-shadow: 0 0 16px rgba(0, 255, 0, 0.35);
+    transition: background 0.15s, color 0.15s, box-shadow 0.15s;
+}
+
+#go-restart:hover {
+    background: #00ff00;
+    color: #000;
+    box-shadow: 0 0 28px rgba(0, 255, 0, 0.8);
+}
+
+@keyframes go-flicker {
+    0%, 88%, 91%, 94%, 100% { opacity: 1; }
+    89%, 92%                 { opacity: 0.55; }
+    90%, 93%                 { opacity: 0.85; }
+}

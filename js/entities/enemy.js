@@ -16,8 +16,19 @@ export class Enemy {
         this.projectiles = [];
         this._fireCooldown = CONFIG.Enemy.FIRE_COOLDOWN;
         this._patrolTarget = this._createPatrolTarget();
-        this._alerted = false;  // fica true ao receber dano, nunca volta ao patrol
+        this._alerted = false;
         this._bodyMat = null;
+
+        // Colisores do cenário — preenchido pelo SceneManager em cada update
+        this._colliders = [];
+
+        // Stuck detection: compara posição a cada 1.2 s
+        this._stuckTimer    = 0;
+        this._stuckCheckPos = new THREE.Vector3().copy(position);
+
+        // Evasão: roda lateralmente para sair de trás de obstáculos
+        this._evasionTimer = 0;
+        this._evasionDir   = 1;   // +1 = direita, -1 = esquerda
 
         this.tank = this._createTank();
         this.tank.position.copy(position);
@@ -35,7 +46,6 @@ export class Enemy {
         tankTexture.wrapS = THREE.RepeatWrapping;
         tankTexture.wrapT = THREE.RepeatWrapping;
 
-        // Material partilhado por todas as pecas — basta alterar aqui para mudar o glow
         this._bodyMat = new THREE.MeshLambertMaterial({
             map: tankTexture,
             emissive: new THREE.Color(0xaa6600),
@@ -67,7 +77,6 @@ export class Enemy {
         return group;
     }
 
-    // Atualiza o brilho do material sem desenhar uma caixa visual em volta do tanque.
     _updateVisuals() {
         if (this.state === Enemy_STATE.ATTACK) {
             this._bodyMat.emissive.setHex(0x550000);
@@ -97,13 +106,44 @@ export class Enemy {
         return player.tank.position;
     }
 
-    _updateState(player) {
-        const dist = this.position.distanceTo(this._getPlayerPosition(player));
+    // ── Line of Sight ─────────────────────────────────────────────────────────
+    // Raio 2D no plano XZ contra todos os colisores estáticos.
+    // Devolve false se algum obstáculo intersectar o segmento from→to.
+    _hasLineOfSight(from, to) {
+        const dx = to.x - from.x;
+        const dz = to.z - from.z;
+        const len = Math.sqrt(dx * dx + dz * dz);
+        if (len < 0.01) return true;
 
-        if (dist <= CONFIG.Enemy.ATTACK_RANGE) {
+        const nx = dx / len;
+        const nz = dz / len;
+
+        for (const col of this._colliders) {
+            const fx = col.x - from.x;
+            const fz = col.z - from.z;
+
+            // Projeção de (col center - from) sobre o raio
+            const t = fx * nx + fz * nz;
+            if (t < 2 || t > len - 2) continue;   // ignorar se atrás ou depois do alvo
+
+            // Distância perpendicular do centro do colisor ao raio
+            const perpX = from.x + nx * t - col.x;
+            const perpZ = from.z + nz * t - col.z;
+            if (perpX * perpX + perpZ * perpZ < col.radius * col.radius) return false;
+        }
+        return true;
+    }
+
+    // ── State machine ─────────────────────────────────────────────────────────
+    // ATTACK só é ativado se houver linha de visão; caso contrário persegue.
+    _updateState(player) {
+        const playerPos = this._getPlayerPosition(player);
+        const dist = this.position.distanceTo(playerPos);
+        const hasLOS = this._hasLineOfSight(this.position, playerPos);
+
+        if (dist <= CONFIG.Enemy.ATTACK_RANGE && hasLOS) {
             this.state = Enemy_STATE.ATTACK;
         } else if (this._alerted || dist <= CONFIG.Enemy.DETECTION_RANGE) {
-            // Ao ser alertado (por dano recebido), nunca volta ao patrol
             this.state = Enemy_STATE.CHASE;
         } else {
             this.state = Enemy_STATE.PATROL;
@@ -141,7 +181,6 @@ export class Enemy {
         const direction = target.clone().sub(this.position);
         direction.y = 0;
         if (direction.lengthSq() === 0) return 1;
-
         return this._getForward().dot(direction.normalize());
     }
 
@@ -161,12 +200,14 @@ export class Enemy {
         this.projectiles.push(proj);
     }
 
+    // Só dispara se estiver voltado, dentro do alcance E com linha de visão.
     _tryShootAt(target) {
         const distance = this.position.distanceTo(target);
         if (
             distance <= CONFIG.Enemy.SHOOT_RANGE &&
             this._getFacingDot(target) >= CONFIG.Enemy.SHOOT_ALIGNMENT &&
-            this._fireCooldown <= 0
+            this._fireCooldown <= 0 &&
+            this._hasLineOfSight(this.position, target)
         ) {
             this._shoot();
             this._fireCooldown = CONFIG.Enemy.FIRE_COOLDOWN;
@@ -185,6 +226,37 @@ export class Enemy {
                 this.projectiles.splice(i, 1);
             }
         }
+    }
+
+    // ── Stuck detection ───────────────────────────────────────────────────────
+    // Compara deslocamento real a cada 1.2 s enquanto devia estar a mover.
+    // Se ficou praticamente parado → inicia evasão lateral.
+    _updateStuck(delta) {
+        this._stuckTimer += delta;
+        if (this._stuckTimer < 1.2) return;
+
+        const moved = this.position.distanceTo(this._stuckCheckPos);
+        this._stuckCheckPos.copy(this.position);
+        this._stuckTimer = 0;
+
+        const shouldBeMoving =
+            this.state === Enemy_STATE.PATROL ||
+            this.state === Enemy_STATE.CHASE;
+
+        if (shouldBeMoving && moved < CONFIG.Enemy.MOVE_SPEED * 0.25) {
+            this._evasionTimer = 1.0 + Math.random() * 0.8;
+            this._evasionDir   = Math.random() > 0.5 ? 1 : -1;
+        }
+    }
+
+    // Roda lateralmente e avança enquanto o timer de evasão estiver ativo.
+    // Devolve true para sinalizar ao update() que deve ignorar o comportamento normal.
+    _updateEvasion(delta) {
+        if (this._evasionTimer <= 0) return false;
+        this._evasionTimer -= delta;
+        this.tank.rotation.y += this._evasionDir * CONFIG.Enemy.ROTATE_SPEED * 1.2 * delta;
+        this._moveForward(delta, 0.9);
+        return true;
     }
 
     _updatePatrol(delta) {
@@ -212,13 +284,20 @@ export class Enemy {
         this._tryShootAt(playerPos);
     }
 
-    update(delta, player) {
+    // colliders: array de {x, z, radius} do Environment, passado pelo SceneManager
+    update(delta, player, colliders) {
         if (!this.alive) return;
+
+        this._colliders = colliders;
 
         this._updateState(player);
         this._updateVisuals();
         this._updateProjectiles(delta);
         this._fireCooldown = Math.max(0, this._fireCooldown - delta);
+        this._updateStuck(delta);
+
+        // Evasão tem prioridade sobre o comportamento normal
+        if (this._updateEvasion(delta)) return;
 
         if (this.state === Enemy_STATE.CHASE) {
             this._updateChase(delta, player);
@@ -229,10 +308,9 @@ export class Enemy {
         }
     }
 
-    // Retorna 'dead' se destruido, 'hit' se ainda tem vida
     takeDamage(amount = 1) {
         this.health -= amount;
-        this._alerted = true;   // persegue o jogador mesmo que este se afaste
+        this._alerted = true;
         if (this.health <= 0) {
             this.destroy();
             return 'dead';
