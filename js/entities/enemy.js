@@ -33,6 +33,9 @@ export class Enemy {
         this.tank = this._createTank();
         this.tank.position.copy(position);
         this.scene.add(this.tank);
+
+        this._healthBarSprite = this._createHealthBar();
+        this.scene.add(this._healthBarSprite);
     }
 
     get position() {
@@ -75,6 +78,42 @@ export class Enemy {
 
         group.scale.setScalar(1.5);
         return group;
+    }
+
+    _createHealthBar() {
+        const canvas = document.createElement('canvas');
+        canvas.width  = 96;
+        canvas.height = 20;
+        this._hbCanvas  = canvas;
+        this._hbTexture = new THREE.CanvasTexture(canvas);
+
+        const mat    = new THREE.SpriteMaterial({ map: this._hbTexture, depthTest: false, transparent: true });
+        const sprite = new THREE.Sprite(mat);
+        sprite.scale.set(7, 1.4, 1);
+        sprite.visible = false;
+        this._drawHealthBar();
+        return sprite;
+    }
+
+    _drawHealthBar() {
+        const ctx = this._hbCanvas.getContext('2d');
+        const W = 96, H = 20;
+        const maxHp = CONFIG.Enemy.HEALTH;
+        const pip = Math.floor((W - 4) / maxHp) - 2; // largura de cada pip
+
+        ctx.clearRect(0, 0, W, H);
+
+        for (let i = 0; i < maxHp; i++) {
+            const x = 2 + i * (pip + 2);
+            ctx.fillStyle = i < this.health ? '#ff3300' : '#3a1000';
+            ctx.fillRect(x, 2, pip, H - 4);
+        }
+
+        ctx.strokeStyle = 'rgba(255,80,0,0.7)';
+        ctx.lineWidth = 1.5;
+        ctx.strokeRect(0.75, 0.75, W - 1.5, H - 1.5);
+
+        this._hbTexture.needsUpdate = true;
     }
 
     _updateVisuals() {
@@ -296,6 +335,13 @@ export class Enemy {
         this._fireCooldown = Math.max(0, this._fireCooldown - delta);
         this._updateStuck(delta);
 
+        // Manter a barra de vida flutuante acima do tanque
+        this._healthBarSprite.position.set(
+            this.position.x,
+            this.position.y + 8,
+            this.position.z
+        );
+
         // Evasão tem prioridade sobre o comportamento normal
         if (this._updateEvasion(delta)) return;
 
@@ -311,6 +357,8 @@ export class Enemy {
     takeDamage(amount = 1) {
         this.health -= amount;
         this._alerted = true;
+        this._healthBarSprite.visible = true;
+        this._drawHealthBar();
         if (this.health <= 0) {
             this.destroy();
             return 'dead';
@@ -321,6 +369,7 @@ export class Enemy {
     destroy() {
         this.alive = false;
         this.scene.remove(this.tank);
+        this.scene.remove(this._healthBarSprite);
         for (const p of this.projectiles) {
             this.scene.remove(p);
         }
