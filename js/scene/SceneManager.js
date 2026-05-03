@@ -59,6 +59,9 @@ export class SceneManager {
         // HUD
         this.hud = new HUD();
 
+        // Flash ao ser atingido
+        this._hitFlashEl = document.getElementById('hit-flash');
+
         // Estado de game over
         this._gameOver = false;
 
@@ -217,6 +220,7 @@ export class SceneManager {
                     this.scene.remove(proj);
                     enemy.projectiles.splice(i, 1);
                     this.lives = Math.max(0, this.lives - 1);
+                    this._triggerHitFlash();
                 }
             }
         }
@@ -287,6 +291,13 @@ export class SceneManager {
         document.getElementById('go-score').textContent     = `PONTUAÇÃO: ${String(this.score).padStart(6, '0')}`;
         document.getElementById('go-highscore').textContent = `RECORDE:   ${String(best).padStart(6, '0')}`;
         document.getElementById('game-over').style.display  = 'flex';
+    }
+
+    _triggerHitFlash() {
+        const el = this._hitFlashEl;
+        el.classList.remove('active');
+        void el.offsetWidth; // força reflow para reiniciar a animação
+        el.classList.add('active');
     }
 
     _resolveStaticCollisions(tankPos, tankRadius = 3) {
