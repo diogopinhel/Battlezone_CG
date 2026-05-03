@@ -178,6 +178,146 @@ html, body {
     90%, 93%                 { opacity: 0.85; }
 }
 
+/* ── Botão partilhado entre menus ────────────────────────────────────────── */
+
+.menu-btn {
+    background: transparent;
+    color: #00ff00;
+    border: 2px solid #00ff00;
+    font-family: 'Courier New', monospace;
+    font-size: 18px;
+    letter-spacing: 4px;
+    padding: 12px 36px;
+    cursor: pointer;
+    pointer-events: all;
+    text-shadow: 0 0 8px #00ff00;
+    box-shadow: 0 0 16px rgba(0, 255, 0, 0.35);
+    transition: background 0.15s, color 0.15s, box-shadow 0.15s;
+}
+
+.menu-btn:hover {
+    background: #00ff00;
+    color: #000;
+    box-shadow: 0 0 28px rgba(0, 255, 0, 0.8);
+}
+
+/* ── Menu inicial ─────────────────────────────────────────────────────────── */
+
+#start-menu {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.82);
+    z-index: 500;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+#start-inner {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 18px;
+}
+
+#start-title {
+    font-size: 86px;
+    letter-spacing: 16px;
+    text-transform: uppercase;
+    color: #00ff00;
+    text-shadow: 0 0 20px #00ff00, 0 0 55px #00ff00, 0 0 110px #00ff00;
+    animation: title-pulse 3s ease-in-out infinite;
+    margin-bottom: 8px;
+}
+
+#start-subtitle {
+    font-size: 14px;
+    letter-spacing: 5px;
+    color: rgba(0, 255, 0, 0.5);
+    margin-bottom: 28px;
+}
+
+#start-nav {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    align-items: center;
+}
+
+#start-nav .menu-btn {
+    width: 260px;
+}
+
+@keyframes title-pulse {
+    0%, 100% { text-shadow: 0 0 20px #00ff00, 0 0 55px #00ff00, 0 0 110px #00ff00; }
+    50%       { text-shadow: 0 0 10px #00ff00, 0 0 28px #00ff00, 0 0  60px #00ff00; }
+}
+
+/* ── Overlay partilhado (créditos + pausa) ───────────────────────────────── */
+
+#credits-overlay,
+#pause-menu {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.88);
+    z-index: 600;
+    align-items: center;
+    justify-content: center;
+}
+
+.overlay-box {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+    border: 2px solid #00ff00;
+    padding: 48px 64px;
+    box-shadow: 0 0 40px rgba(0, 255, 0, 0.25);
+}
+
+.overlay-title {
+    font-size: 36px;
+    letter-spacing: 10px;
+    text-shadow: 0 0 12px #00ff00;
+    margin-bottom: 12px;
+}
+
+.credits-label {
+    font-size: 14px;
+    letter-spacing: 2px;
+    color: rgba(0, 255, 0, 0.7);
+    text-align: center;
+}
+
+.credits-label em {
+    color: #00ff00;
+    font-style: normal;
+}
+
+#credits-names {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    margin: 14px 0 8px;
+    font-size: 17px;
+    letter-spacing: 3px;
+    text-shadow: 0 0 8px #00ff00;
+}
+
+#pause-nav {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    align-items: center;
+    margin-top: 8px;
+}
+
+#pause-nav .menu-btn {
+    width: 280px;
+}
+
 /* ── Flash vermelho ao ser atingido ──────────────────────────────────────── */
 
 #hit-flash {

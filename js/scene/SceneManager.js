@@ -62,8 +62,17 @@ export class SceneManager {
         // Flash ao ser atingido
         this._hitFlashEl = document.getElementById('hit-flash');
 
-        // Estado de game over
-        this._gameOver = false;
+        // Estado de game over, pausa e início
+        this._gameActive = false;
+        this._gameOver   = false;
+        this._paused     = false;
+        this._pauseEl    = document.getElementById('pause-menu');
+
+        document.getElementById('btn-resume').addEventListener('click', () => this.resume());
+        document.getElementById('btn-pause-quit').addEventListener('click', () => location.reload());
+        document.addEventListener('keydown', e => {
+            if (e.code === 'Escape') this._togglePause();
+        });
 
         // Clock para calcular delta time correto por frame
         this.clock = new THREE.Clock();
@@ -293,6 +302,28 @@ export class SceneManager {
         document.getElementById('game-over').style.display  = 'flex';
     }
 
+    beginGame() {
+        this._gameActive = true;
+        this.clock.getDelta(); // descarta o delta acumulado durante o menu
+    }
+
+    _togglePause() {
+        if (!this._gameActive || this._gameOver) return;
+        this._paused ? this.resume() : this.pause();
+    }
+
+    pause() {
+        this._paused = true;
+        this._pauseEl.style.display = 'flex';
+        document.exitPointerLock?.();
+        this.clock.getDelta(); // descarta o delta acumulado durante a pausa
+    }
+
+    resume() {
+        this._paused = false;
+        this._pauseEl.style.display = 'none';
+    }
+
     _triggerHitFlash() {
         const el = this._hitFlashEl;
         el.classList.remove('active');
@@ -315,7 +346,7 @@ export class SceneManager {
     }
 
     _update() {
-        if (this._gameOver) return;
+        if (!this._gameActive || this._gameOver || this._paused) return;
 
         const delta = this.clock.getDelta();
         this.player.update(delta);
