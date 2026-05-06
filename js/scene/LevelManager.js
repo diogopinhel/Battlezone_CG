@@ -26,8 +26,14 @@ export class LevelManager {
     }
 
     getEnemyCount() {
+        const counts = CONFIG.LEVELS.WAVE_ENEMY_COUNTS;
+        if (this.level <= counts.length) {
+            return counts[this.level - 1];
+        }
+
+        const extraLevels = this.level - counts.length;
         return Math.min(
-            CONFIG.LEVELS.BASE_ENEMY_COUNT + this.level * CONFIG.LEVELS.ENEMIES_PER_LEVEL,
+            counts[counts.length - 1] + Math.floor((extraLevels + 1) / 2),
             CONFIG.LEVELS.MAX_ENEMY_COUNT
         );
     }
@@ -45,15 +51,29 @@ export class LevelManager {
 
     getDifficulty() {
         const levelIndex = this.level - 1;
+        const armoredEnemyChance = this._getArmoredEnemyChance();
 
         return {
-            health: this.level >= 4 ? CONFIG.Enemy.HEALTH + 1 : CONFIG.Enemy.HEALTH,
-            moveSpeedMultiplier: 1 + levelIndex * 0.05,
-            fireCooldownMultiplier: Math.max(0.55, 1 - levelIndex * 0.05),
-            detectionRangeMultiplier: 1 + levelIndex * 0.06,
-            startsAlertedChance: this.level >= 5 ? Math.min(0.35, levelIndex * 0.05) : 0,
-            groupAlertRadius: CONFIG.LEVELS.GROUP_ALERT_RADIUS + levelIndex * 15,
-            shotNoiseRadius: CONFIG.LEVELS.SHOT_NOISE_RADIUS + levelIndex * 10,
+            health: CONFIG.Enemy.HEALTH,
+            armoredHealth: CONFIG.Enemy.HEALTH + 1,
+            armoredEnemyChance,
+            moveSpeedMultiplier: Math.min(1.35, 1 + levelIndex * 0.04),
+            fireCooldownMultiplier: Math.max(0.65, 1 - levelIndex * 0.04),
+            detectionRangeMultiplier: Math.min(1.3, 1 + levelIndex * 0.05),
+            startsAlertedChance: this.level >= 5 ? Math.min(0.3, levelIndex * 0.04) : 0,
+            groupAlertRadius: Math.min(260, CONFIG.LEVELS.GROUP_ALERT_RADIUS + levelIndex * 12),
+            shotNoiseRadius: Math.min(300, CONFIG.LEVELS.SHOT_NOISE_RADIUS + levelIndex * 8),
         };
+    }
+
+    _getArmoredEnemyChance() {
+        const startLevel = CONFIG.LEVELS.ARMORED_ENEMY_START_LEVEL;
+        const fullLevel = CONFIG.LEVELS.ARMORED_ENEMY_FULL_LEVEL;
+
+        if (this.level < startLevel) return 0;
+        if (this.level >= fullLevel) return 1;
+
+        const progress = (this.level - startLevel) / (fullLevel - startLevel);
+        return 0.25 + progress * 0.75;
     }
 }

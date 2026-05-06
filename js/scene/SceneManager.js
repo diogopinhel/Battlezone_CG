@@ -208,10 +208,14 @@ export class SceneManager {
             const groupCenter = this._createGroupCenter();
 
             for (let i = 0; i < groupSize; i++) {
+                const enemyHealth = Math.random() < difficulty.armoredEnemyChance
+                    ? difficulty.armoredHealth
+                    : difficulty.health;
+
                 const enemy = new Enemy(this.scene, this._createEnemySpawnPosition(groupCenter), {
                     groupId,
                     patrolCenter: groupCenter,
-                    health: difficulty.health,
+                    health: enemyHealth,
                     moveSpeedMultiplier: difficulty.moveSpeedMultiplier,
                     fireCooldownMultiplier: difficulty.fireCooldownMultiplier,
                     detectionRangeMultiplier: difficulty.detectionRangeMultiplier,
