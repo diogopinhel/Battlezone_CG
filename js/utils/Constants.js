@@ -69,6 +69,21 @@ export const CONFIG = {
         BODY_RADIUS: 6,                 // raio de colisao fisica tank vs tank
     },
 
+    // Niveis / ondas
+    LEVELS: {
+        BASE_ENEMY_COUNT: 3,             // inimigos no nivel 1 antes do bonus por nivel
+        ENEMIES_PER_LEVEL: 1,            // inimigos extra por nivel
+        MAX_ENEMY_COUNT: 14,             // limite para evitar ondas demasiado pesadas
+        MAX_GROUP_SIZE: 3,               // tamanho maximo de uma patrulha
+        WAVE_SPAWN_MIN_DISTANCE: 210,    // distancia minima da patrulha ao jogador
+        WAVE_SPAWN_MAX_DISTANCE: 460,    // distancia maxima da patrulha ao jogador
+        GROUP_SPAWN_RADIUS: 32,          // dispersao inicial dos tanques dentro da patrulha
+        GROUP_PATROL_RADIUS: 60,         // zona de patrulha de cada grupo
+        GROUP_ALERT_RADIUS: 180,         // distancia a que outros grupos podem ouvir/ver combate
+        SHOT_NOISE_RADIUS: 220,          // raio de alerta quando o jogador dispara
+        LEVEL_MESSAGE_TIME: 2.2,         // segundos que a mensagem de nivel fica visivel
+    },
+
     // Radar / minimapa
     RADAR: {
         RANGE: 1000,  // mostra o mapa completo (ground = 2000×2000, half = 1000)

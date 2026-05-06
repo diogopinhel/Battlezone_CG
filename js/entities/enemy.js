@@ -8,15 +8,23 @@ const Enemy_STATE = {
 };
 
 export class Enemy {
-    constructor(scene, position = new THREE.Vector3()) {
+    constructor(scene, position = new THREE.Vector3(), options = {}) {
         this.scene = scene;
         this.state = Enemy_STATE.PATROL;
-        this.health = CONFIG.Enemy.HEALTH;
+        this.groupId = options.groupId ?? null;
+        this.maxHealth = options.health ?? CONFIG.Enemy.HEALTH;
+        this.health = this.maxHealth;
+        this.moveSpeedMultiplier = options.moveSpeedMultiplier ?? 1;
+        this.fireCooldownMultiplier = options.fireCooldownMultiplier ?? 1;
+        this.detectionRangeMultiplier = options.detectionRangeMultiplier ?? 1;
+        this._patrolCenter = options.patrolCenter?.clone?.() ?? null;
+        this._patrolRadius = options.patrolRadius ?? CONFIG.LEVELS.GROUP_PATROL_RADIUS;
         this.alive = true;
         this.projectiles = [];
-        this._fireCooldown = CONFIG.Enemy.FIRE_COOLDOWN;
+        this._fireCooldown = this._getFireCooldown();
         this._patrolTarget = this._createPatrolTarget();
-        this._alerted = false;
+        this._alerted = options.startsAlerted ?? false;
+        this._lastKnownPlayerPosition = null;
         this._bodyMat = null;
 
         // Colisores do cenário — preenchido pelo SceneManager em cada update
@@ -40,6 +48,21 @@ export class Enemy {
 
     get position() {
         return this.tank.position;
+    }
+
+    isAlerted() {
+        return this._alerted;
+    }
+
+    alert(playerPosition = null) {
+        this._alerted = true;
+        if (playerPosition) {
+            this._lastKnownPlayerPosition = playerPosition.clone();
+        }
+    }
+
+    _getFireCooldown() {
+        return CONFIG.Enemy.FIRE_COOLDOWN * this.fireCooldownMultiplier;
     }
 
     _createTank() {
@@ -98,7 +121,7 @@ export class Enemy {
     _drawHealthBar() {
         const ctx = this._hbCanvas.getContext('2d');
         const W = 96, H = 20;
-        const maxHp = CONFIG.Enemy.HEALTH;
+        const maxHp = this.maxHealth;
         const pip = Math.floor((W - 4) / maxHp) - 2; // largura de cada pip
 
         ctx.clearRect(0, 0, W, H);
@@ -128,6 +151,17 @@ export class Enemy {
 
     _createPatrolTarget() {
         const halfMap = CONFIG.GROUND_SIZE / 2 - 40;
+
+        if (this._patrolCenter) {
+            const angle = Math.random() * Math.PI * 2;
+            const dist = THREE.MathUtils.randFloat(20, this._patrolRadius);
+            return new THREE.Vector3(
+                THREE.MathUtils.clamp(this._patrolCenter.x + Math.cos(angle) * dist, -halfMap, halfMap),
+                0,
+                THREE.MathUtils.clamp(this._patrolCenter.z + Math.sin(angle) * dist, -halfMap, halfMap)
+            );
+        }
+
         return new THREE.Vector3(
             THREE.MathUtils.randFloatSpread(halfMap * 2),
             0,
@@ -179,10 +213,15 @@ export class Enemy {
         const playerPos = this._getPlayerPosition(player);
         const dist = this.position.distanceTo(playerPos);
         const hasLOS = this._hasLineOfSight(this.position, playerPos);
+        const detectionRange = CONFIG.Enemy.DETECTION_RANGE * this.detectionRangeMultiplier;
 
         if (dist <= CONFIG.Enemy.ATTACK_RANGE && hasLOS) {
+            this.alert(playerPos);
             this.state = Enemy_STATE.ATTACK;
-        } else if (this._alerted || dist <= CONFIG.Enemy.DETECTION_RANGE) {
+        } else if (dist <= detectionRange) {
+            this.alert(playerPos);
+            this.state = Enemy_STATE.CHASE;
+        } else if (this._alerted) {
             this.state = Enemy_STATE.CHASE;
         } else {
             this.state = Enemy_STATE.PATROL;
@@ -208,7 +247,7 @@ export class Enemy {
 
     _moveForward(delta, speedScale = 1) {
         const forward = this._getForward();
-        const speed = CONFIG.Enemy.MOVE_SPEED * speedScale;
+        const speed = CONFIG.Enemy.MOVE_SPEED * this.moveSpeedMultiplier * speedScale;
         const halfMap = CONFIG.GROUND_SIZE / 2 - 10;
 
         this.position.addScaledVector(forward, speed * delta);
@@ -249,7 +288,7 @@ export class Enemy {
             this._hasLineOfSight(this.position, target)
         ) {
             this._shoot();
-            this._fireCooldown = CONFIG.Enemy.FIRE_COOLDOWN;
+            this._fireCooldown = this._getFireCooldown();
         }
     }
 
@@ -282,7 +321,7 @@ export class Enemy {
             this.state === Enemy_STATE.PATROL ||
             this.state === Enemy_STATE.CHASE;
 
-        if (shouldBeMoving && moved < CONFIG.Enemy.MOVE_SPEED * 0.25) {
+        if (shouldBeMoving && moved < CONFIG.Enemy.MOVE_SPEED * this.moveSpeedMultiplier * 0.25) {
             this._evasionTimer = 1.0 + Math.random() * 0.8;
             this._evasionDir   = Math.random() > 0.5 ? 1 : -1;
         }

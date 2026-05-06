@@ -3,6 +3,7 @@ import { CONFIG } from '../utils/Constants.js';
 import { Ground } from './Ground.js';
 import { Lighting } from './Lighting.js';
 import { Environment } from './Environment.js';
+import { LevelManager } from './LevelManager.js';
 import { InputHandler } from '../input/InputHandler.js';
 import { Player } from '../entities/Player.js';
 import { Enemy } from '../entities/Enemy.js';
@@ -50,10 +51,12 @@ export class SceneManager {
         // Estado do jogo
         this.score = 0;
         this.lives = 3;
+        this.levelManager = new LevelManager();
         this.enemies     = [];
         this.wrecks      = [];
         this.lifePickups = [];
-        this._spawnEnemies();
+        this._nextGroupId = 1;
+        this._spawnEnemyWave();
         this._spawnLifePickups();
 
         // HUD
@@ -61,6 +64,7 @@ export class SceneManager {
 
         // Flash ao ser atingido
         this._hitFlashEl = document.getElementById('hit-flash');
+        this._levelMessageEl = document.getElementById('level-message');
 
         // Estado de game over, pausa e início
         this._gameActive = false;
@@ -140,13 +144,24 @@ export class SceneManager {
         this.renderer.setSize(window.innerWidth, window.innerHeight);
     }
 
-    _createEnemySpawnPosition() {
+    _createEnemySpawnPosition(center = null) {
         const halfMap = CONFIG.GROUND_SIZE / 2 - 80;
         const playerPos = this.player.tank.position;
         let position;
 
         // Garante que os inimigos nao aparecem imediatamente em cima do jogador.
         do {
+            if (center) {
+                const angle = Math.random() * Math.PI * 2;
+                const dist = THREE.MathUtils.randFloat(8, CONFIG.LEVELS.GROUP_SPAWN_RADIUS);
+                position = new THREE.Vector3(
+                    THREE.MathUtils.clamp(center.x + Math.cos(angle) * dist, -halfMap, halfMap),
+                    0,
+                    THREE.MathUtils.clamp(center.z + Math.sin(angle) * dist, -halfMap, halfMap)
+                );
+                continue;
+            }
+
             position = new THREE.Vector3(
                 THREE.MathUtils.randFloatSpread(halfMap * 2),
                 0,
@@ -157,11 +172,104 @@ export class SceneManager {
         return position;
     }
 
-    _spawnEnemies() {
-        for (let i = 0; i < CONFIG.Enemy.COUNT; i++) {
-            const enemy = new Enemy(this.scene, this._createEnemySpawnPosition());
-            this.enemies.push(enemy);
+    _createGroupCenter() {
+        const playerPos = this.player.tank.position;
+        const halfMap = CONFIG.GROUND_SIZE / 2 - 80;
+        let position;
+
+        do {
+            const angle = Math.random() * Math.PI * 2;
+            const dist = THREE.MathUtils.randFloat(
+                CONFIG.LEVELS.WAVE_SPAWN_MIN_DISTANCE,
+                CONFIG.LEVELS.WAVE_SPAWN_MAX_DISTANCE
+            );
+
+            position = new THREE.Vector3(
+                THREE.MathUtils.clamp(playerPos.x + Math.cos(angle) * dist, -halfMap, halfMap),
+                0,
+                THREE.MathUtils.clamp(playerPos.z + Math.sin(angle) * dist, -halfMap, halfMap)
+            );
+        } while (position.distanceTo(playerPos) < CONFIG.LEVELS.WAVE_SPAWN_MIN_DISTANCE);
+
+        return position;
+    }
+
+    _spawnEnemyWave() {
+        const difficulty = this.levelManager.getDifficulty();
+        const groupSizeLimit = this.levelManager.getGroupSizeLimit();
+        let remaining = this.levelManager.waveTotalEnemies;
+
+        while (remaining > 0) {
+            const groupId = this._nextGroupId++;
+            const groupSize = Math.min(
+                remaining,
+                THREE.MathUtils.randInt(1, groupSizeLimit)
+            );
+            const groupCenter = this._createGroupCenter();
+
+            for (let i = 0; i < groupSize; i++) {
+                const enemy = new Enemy(this.scene, this._createEnemySpawnPosition(groupCenter), {
+                    groupId,
+                    patrolCenter: groupCenter,
+                    health: difficulty.health,
+                    moveSpeedMultiplier: difficulty.moveSpeedMultiplier,
+                    fireCooldownMultiplier: difficulty.fireCooldownMultiplier,
+                    detectionRangeMultiplier: difficulty.detectionRangeMultiplier,
+                    startsAlerted: Math.random() < difficulty.startsAlertedChance,
+                });
+
+                this.enemies.push(enemy);
+            }
+
+            remaining -= groupSize;
         }
+    }
+
+    _alertEnemyGroup(sourceEnemy, playerPosition = this.player.tank.position) {
+        for (const enemy of this.enemies) {
+            if (!enemy.alive || enemy === sourceEnemy) continue;
+            if (enemy.groupId === sourceEnemy.groupId) {
+                enemy.alert(playerPosition);
+            }
+        }
+    }
+
+    _alertNearbyEnemies(position, radius, playerPosition = this.player.tank.position) {
+        for (const enemy of this.enemies) {
+            if (!enemy.alive) continue;
+            if (enemy.position.distanceTo(position) <= radius) {
+                enemy.alert(playerPosition);
+            }
+        }
+    }
+
+    _handleEnemyAlert(sourceEnemy) {
+        const difficulty = this.levelManager.getDifficulty();
+        this._alertEnemyGroup(sourceEnemy);
+        this._alertNearbyEnemies(sourceEnemy.position, difficulty.groupAlertRadius);
+    }
+
+    _advanceLevel() {
+        this.levelManager.advanceLevel();
+        this._spawnEnemyWave();
+        this._showLevelMessage();
+    }
+
+    _showLevelMessage() {
+        if (!this._levelMessageEl) return;
+
+        this._levelMessageEl.innerHTML = `
+            <span>NIVEL ${this.levelManager.level}</span>
+            <small>NOVA ONDA</small>
+        `;
+        this._levelMessageEl.classList.remove('active');
+        void this._levelMessageEl.offsetWidth;
+        this._levelMessageEl.classList.add('active');
+
+        window.clearTimeout(this._levelMessageTimer);
+        this._levelMessageTimer = window.setTimeout(() => {
+            this._levelMessageEl.classList.remove('active');
+        }, CONFIG.LEVELS.LEVEL_MESSAGE_TIME * 1000);
     }
 
     _spawnLifePickups() {
@@ -203,7 +311,9 @@ export class SceneManager {
                 if (!enemy.alive) continue;
                 if (proj.position.distanceTo(enemy.position) < CONFIG.Enemy.HIT_RADIUS) {
                     const result = enemy.takeDamage(1);
+                    this._handleEnemyAlert(enemy);
                     if (result === 'dead') {
+                        this.levelManager.registerKill();
                         this.score++;
                         this.audio.playDestroy();
                         this.wrecks.push(new Wreck(this.scene, enemy.position.clone()));
@@ -349,15 +459,33 @@ export class SceneManager {
         if (!this._gameActive || this._gameOver || this._paused) return;
 
         const delta = this.clock.getDelta();
+        const previousShotsFired = this.player.shotsFired;
+
         this.player.update(delta);
+        if (this.player.shotsFired > previousShotsFired && this.player.lastShotPosition) {
+            const difficulty = this.levelManager.getDifficulty();
+            this._alertNearbyEnemies(
+                this.player.lastShotPosition,
+                difficulty.shotNoiseRadius
+            );
+        }
+
         this._resolveStaticCollisions(this.player.tank.position);
 
         for (const enemy of this.enemies) {
+            const wasAlerted = enemy.isAlerted();
             enemy.update(delta, this.player, this.environment.colliders);
+            if (!wasAlerted && enemy.isAlerted()) {
+                this._handleEnemyAlert(enemy);
+            }
             if (enemy.alive) this._resolveStaticCollisions(enemy.position);
         }
 
         this._checkCollisions();
+
+        if (this.enemies.length === 0) {
+            this._advanceLevel();
+        }
 
         for (const wreck of this.wrecks) wreck.update(delta);
         this.wrecks = this.wrecks.filter(w => w.alive);
@@ -374,7 +502,11 @@ export class SceneManager {
             this.player.tank.rotation.y,
             this.enemies,
             this.score,
-            this.lives
+            this.lives,
+            this.levelManager.level,
+            this.levelManager.getProgress(),
+            this.levelManager.waveKilledEnemies,
+            this.levelManager.waveTotalEnemies
         );
     }
 }
