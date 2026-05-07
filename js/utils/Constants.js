@@ -33,8 +33,22 @@ export const CONFIG = {
 
     // Iluminacao
     LIGHTS: {
-        AMBIENT_INTENSITY: 0.3,
+        AMBIENT_INTENSITY:     0.3,
         DIRECTIONAL_INTENSITY: 0.8,
+        TANK_COLOR:     0xffffff,   // holofote branco do tanque
+        TANK_INTENSITY: 2.0,
+        TANK_DISTANCE:  50,         // alcance em unidades de mundo
+        VOLCANO_COLOR:     0xff4400, // laranja-vermelho da lava
+        VOLCANO_INTENSITY: 50.0,
+        VOLCANO_DISTANCE:  700,
+    },
+
+    // Vulcão — posição fixa no mapa (partilhada por Environment e Lighting)
+    VOLCANO: {
+        X: 350,
+        Z: -300,
+        BASE_RADIUS: 60,
+        HEIGHT: 130,
     },
 
     // Jogador / tanque
@@ -46,6 +60,7 @@ export const CONFIG = {
         PROJECTILE_SPEED: 150,      // unidades por segundo
         PROJECTILE_MAX_DIST: 800,   // distancia maxima antes de desaparecer
         MAX_LIVES: 5,               // teto de vidas acumulaveis
+        MOUSE_SENSITIVITY: 0.002,   // radianos por pixel de movimento do rato
     },
 
     // Inimigos / tanques controlados por IA

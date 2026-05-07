@@ -42,7 +42,9 @@ export class Ground {
             CONFIG.GROUND_SEGMENTS
         );
 
-        const material = new THREE.MeshBasicMaterial({ map: this._createTexture() });
+        // MeshLambertMaterial (em vez de MeshBasicMaterial) para que o chão
+        // reaja às PointLights — tanque e vulcão ficam visíveis no chão.
+        const material = new THREE.MeshLambertMaterial({ map: this._createTexture() });
 
         const mesh = new THREE.Mesh(geometry, material);
         mesh.rotation.x = -Math.PI / 2;

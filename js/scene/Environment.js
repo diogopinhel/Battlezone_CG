@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { CONFIG } from '../utils/Constants.js';
 
 const GREEN = 0x00ff00;
 
@@ -10,6 +11,7 @@ export class Environment {
         this._addMoon();
         this._addTrees();
         this._addRocks();
+        this._addVolcano();
     }
 
     // ── Stars ─────────────────────────────────────────────────────────────────
@@ -161,6 +163,56 @@ export class Environment {
 
             this.colliders.push({ x, z, radius: 5 * scale });
         }
+    }
+
+    // ── Volcano ───────────────────────────────────────────────────────────────
+    //
+    // O vulcão é um cone sólido (MeshLambertMaterial) porque precisa de receber
+    // a iluminação da PointLight da cratera — geometria wireframe não captura luz.
+    // A animação de erupção é adicionada na semana 7.
+
+    _addVolcano() {
+        const { X, Z, BASE_RADIUS, HEIGHT } = CONFIG.VOLCANO;
+        const group = new THREE.Group();
+
+        // Corpo principal — cone rochoso com emissive laranja-vermelho.
+        // emissive: cor que o material emite por si próprio, sem depender de luzes externas.
+        // Garante que o vulcão é claramente laranja mesmo onde a PointLight é fraca.
+        const bodyMat = new THREE.MeshLambertMaterial({
+            color:             0x3a2010,
+            emissive:          new THREE.Color(0xff2200),
+            emissiveIntensity: 0.45,
+        });
+        const body = new THREE.Mesh(new THREE.ConeGeometry(BASE_RADIUS, HEIGHT, 14), bodyMat);
+        body.position.y = HEIGHT / 2;
+        body.castShadow = true;
+        body.receiveShadow = true;
+        group.add(body);
+
+        // Anel da cratera no topo — torus ligeiramente mais escuro
+        const rimMat = new THREE.MeshLambertMaterial({ color: 0x150800 });
+        const rim = new THREE.Mesh(new THREE.TorusGeometry(13, 5, 8, 20), rimMat);
+        rim.position.y = HEIGHT - 6;
+        rim.receiveShadow = true;
+        group.add(rim);
+
+        // Contorno wireframe verde (estética Battlezone) sobreposto ao cone
+        const wireMat = new THREE.LineBasicMaterial({ color: GREEN, opacity: 0.4, transparent: true });
+        const wire = new THREE.LineSegments(
+            new THREE.EdgesGeometry(new THREE.ConeGeometry(BASE_RADIUS, HEIGHT, 14)),
+            wireMat
+        );
+        wire.position.y = HEIGHT / 2;
+        group.add(wire);
+
+        group.position.set(X, 0, Z);
+        this.group.add(group);
+
+        // Expõe o material para o toggle da tecla 4 poder controlar o emissive
+        this.volcanoMat = bodyMat;
+
+        // Colisor — evita que tanques atravessem o vulcão
+        this.colliders.push({ x: X, z: Z, radius: BASE_RADIUS });
     }
 
     // ─────────────────────────────────────────────────────────────────────────

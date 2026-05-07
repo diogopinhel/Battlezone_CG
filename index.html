@@ -22,8 +22,10 @@
             <div id="hud-score">SCORE: 000000</div>
         </div>
 
-        <!-- Canto superior direito: radar -->
-        <canvas id="hud-radar" width="200" height="200"></canvas>
+        <!-- Canto superior direito: moldura do radar (o Three.js renderiza dentro via viewport) -->
+        <div id="hud-radar-frame">
+            <span id="hud-radar-label">RADAR</span>
+        </div>
     </div>
 
     <!-- Ecrã de Game Over -->
