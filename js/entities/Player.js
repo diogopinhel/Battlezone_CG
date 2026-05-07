@@ -10,6 +10,8 @@ export class Player {
 
         this.projectiles = [];
         this._fireCooldown = 0;
+        this.shotsFired = 0;
+        this.lastShotPosition = null;
 
         this._turretYaw = 0;
 
@@ -163,6 +165,8 @@ export class Player {
 
         this.scene.add(proj);
         this.projectiles.push(proj);
+        this.shotsFired++;
+        this.lastShotPosition = proj.position.clone();
         this.audio.playShoot();
     }
 

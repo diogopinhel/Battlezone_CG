@@ -11,6 +11,48 @@
     <!-- Botão fullscreen -->
     <button id="btn-fullscreen" title="Fullscreen (F)">⛶</button>
 
+    <!-- Menu inicial -->
+    <div id="start-menu">
+        <div id="start-inner">
+            <h1 id="start-title">BATTLEZONE</h1>
+            <p id="start-subtitle">COMPUTAÇÃO GRÁFICA &middot; UTAD</p>
+            <nav id="start-nav">
+                <button class="menu-btn" id="btn-start">INICIAR</button>
+                <button class="menu-btn" id="btn-credits">CRÉDITOS</button>
+                <button class="menu-btn" id="btn-quit">SAIR</button>
+            </nav>
+        </div>
+    </div>
+
+    <!-- Overlay de créditos -->
+    <div id="credits-overlay">
+        <div class="overlay-box">
+            <h2 class="overlay-title">CRÉDITOS</h2>
+            <p class="credits-label">Desenvolvido no âmbito da unidade curricular de</p>
+            <p class="credits-label"><em>Computação Gráfica</em> &mdash; UTAD</p>
+            <div id="credits-names">
+                <p>Diogo Pinhel</p>
+                <p>João Lima</p>
+                <p>João Cardoso</p>
+            </div>
+            <button class="menu-btn" id="btn-credits-back">VOLTAR</button>
+        </div>
+    </div>
+
+    <!-- Menu de pausa -->
+    <div id="pause-menu">
+        <div class="overlay-box">
+            <h2 class="overlay-title">PAUSA</h2>
+            <nav id="pause-nav">
+                <button class="menu-btn" id="btn-resume">CONTINUAR</button>
+                <button class="menu-btn" id="btn-pause-quit">SAIR PARA MENU</button>
+            </nav>
+        </div>
+    </div>
+
+    <!-- Flash vermelho ao ser atingido -->
+    <div id="hit-flash"></div>
+
     <!-- Mira central -->
     <div id="crosshair"></div>
 
@@ -20,12 +62,20 @@
         <div id="hud-left">
             <div id="hud-lives">VIDAS: ♥♥♥</div>
             <div id="hud-score">SCORE: 000000</div>
+            <div id="hud-level">NIVEL: 01</div>
+            <div id="hud-progress">
+                <div id="hud-progress-label">ONDA: 0/0</div>
+                <div id="hud-progress-track">
+                    <div id="hud-progress-fill"></div>
+                </div>
+            </div>
         </div>
 
         <!-- Canto superior direito: moldura do radar (o Three.js renderiza dentro via viewport) -->
         <div id="hud-radar-frame">
             <span id="hud-radar-label">RADAR</span>
         </div>
+        <div id="level-message"></div>
     </div>
 
     <!-- Ecrã de Game Over -->

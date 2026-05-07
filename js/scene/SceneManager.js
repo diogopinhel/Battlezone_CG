@@ -3,6 +3,7 @@ import { CONFIG } from '../utils/Constants.js';
 import { Ground } from './Ground.js';
 import { Lighting } from './Lighting.js';
 import { Environment } from './Environment.js';
+import { LevelManager } from './LevelManager.js';
 import { InputHandler } from '../input/InputHandler.js';
 import { Player } from '../entities/Player.js';
 import { Enemy } from '../entities/Enemy.js';
@@ -57,17 +58,32 @@ export class SceneManager {
         // Estado do jogo
         this.score = 0;
         this.lives = 3;
+        this.levelManager = new LevelManager();
         this.enemies     = [];
         this.wrecks      = [];
         this.lifePickups = [];
-        this._spawnEnemies();
+        this._nextGroupId = 1;
+        this._spawnEnemyWave();
         this._spawnLifePickups();
 
         // HUD
         this.hud = new HUD();
 
-        // Estado de game over
-        this._gameOver = false;
+        // Flash ao ser atingido
+        this._hitFlashEl = document.getElementById('hit-flash');
+        this._levelMessageEl = document.getElementById('level-message');
+
+        // Estado de game over, pausa e início
+        this._gameActive = false;
+        this._gameOver   = false;
+        this._paused     = false;
+        this._pauseEl    = document.getElementById('pause-menu');
+
+        document.getElementById('btn-resume').addEventListener('click', () => this.resume());
+        document.getElementById('btn-pause-quit').addEventListener('click', () => location.reload());
+        document.addEventListener('keydown', e => {
+            if (e.code === 'Escape') this._togglePause();
+        });
 
         // Clock para calcular delta time correto por frame
         this.clock = new THREE.Clock();
@@ -163,13 +179,24 @@ export class SceneManager {
         this.renderer.setSize(window.innerWidth, window.innerHeight);
     }
 
-    _createEnemySpawnPosition() {
+    _createEnemySpawnPosition(center = null) {
         const halfMap = CONFIG.GROUND_SIZE / 2 - 80;
         const playerPos = this.player.tank.position;
         let position;
 
         // Garante que os inimigos nao aparecem imediatamente em cima do jogador.
         do {
+            if (center) {
+                const angle = Math.random() * Math.PI * 2;
+                const dist = THREE.MathUtils.randFloat(8, CONFIG.LEVELS.GROUP_SPAWN_RADIUS);
+                position = new THREE.Vector3(
+                    THREE.MathUtils.clamp(center.x + Math.cos(angle) * dist, -halfMap, halfMap),
+                    0,
+                    THREE.MathUtils.clamp(center.z + Math.sin(angle) * dist, -halfMap, halfMap)
+                );
+                continue;
+            }
+
             position = new THREE.Vector3(
                 THREE.MathUtils.randFloatSpread(halfMap * 2),
                 0,
@@ -180,11 +207,108 @@ export class SceneManager {
         return position;
     }
 
-    _spawnEnemies() {
-        for (let i = 0; i < CONFIG.Enemy.COUNT; i++) {
-            const enemy = new Enemy(this.scene, this._createEnemySpawnPosition());
-            this.enemies.push(enemy);
+    _createGroupCenter() {
+        const playerPos = this.player.tank.position;
+        const halfMap = CONFIG.GROUND_SIZE / 2 - 80;
+        let position;
+
+        do {
+            const angle = Math.random() * Math.PI * 2;
+            const dist = THREE.MathUtils.randFloat(
+                CONFIG.LEVELS.WAVE_SPAWN_MIN_DISTANCE,
+                CONFIG.LEVELS.WAVE_SPAWN_MAX_DISTANCE
+            );
+
+            position = new THREE.Vector3(
+                THREE.MathUtils.clamp(playerPos.x + Math.cos(angle) * dist, -halfMap, halfMap),
+                0,
+                THREE.MathUtils.clamp(playerPos.z + Math.sin(angle) * dist, -halfMap, halfMap)
+            );
+        } while (position.distanceTo(playerPos) < CONFIG.LEVELS.WAVE_SPAWN_MIN_DISTANCE);
+
+        return position;
+    }
+
+    _spawnEnemyWave() {
+        const difficulty = this.levelManager.getDifficulty();
+        const groupSizeLimit = this.levelManager.getGroupSizeLimit();
+        let remaining = this.levelManager.waveTotalEnemies;
+
+        while (remaining > 0) {
+            const groupId = this._nextGroupId++;
+            const groupSize = Math.min(
+                remaining,
+                THREE.MathUtils.randInt(1, groupSizeLimit)
+            );
+            const groupCenter = this._createGroupCenter();
+
+            for (let i = 0; i < groupSize; i++) {
+                const enemyHealth = Math.random() < difficulty.armoredEnemyChance
+                    ? difficulty.armoredHealth
+                    : difficulty.health;
+
+                const enemy = new Enemy(this.scene, this._createEnemySpawnPosition(groupCenter), {
+                    groupId,
+                    patrolCenter: groupCenter,
+                    health: enemyHealth,
+                    moveSpeedMultiplier: difficulty.moveSpeedMultiplier,
+                    fireCooldownMultiplier: difficulty.fireCooldownMultiplier,
+                    detectionRangeMultiplier: difficulty.detectionRangeMultiplier,
+                    startsAlerted: Math.random() < difficulty.startsAlertedChance,
+                });
+
+                this.enemies.push(enemy);
+            }
+
+            remaining -= groupSize;
         }
+    }
+
+    _alertEnemyGroup(sourceEnemy, playerPosition = this.player.tank.position) {
+        for (const enemy of this.enemies) {
+            if (!enemy.alive || enemy === sourceEnemy) continue;
+            if (enemy.groupId === sourceEnemy.groupId) {
+                enemy.alert(playerPosition);
+            }
+        }
+    }
+
+    _alertNearbyEnemies(position, radius, playerPosition = this.player.tank.position) {
+        for (const enemy of this.enemies) {
+            if (!enemy.alive) continue;
+            if (enemy.position.distanceTo(position) <= radius) {
+                enemy.alert(playerPosition);
+            }
+        }
+    }
+
+    _handleEnemyAlert(sourceEnemy) {
+        const difficulty = this.levelManager.getDifficulty();
+        this._alertEnemyGroup(sourceEnemy);
+        this._alertNearbyEnemies(sourceEnemy.position, difficulty.groupAlertRadius);
+    }
+
+    _advanceLevel() {
+        this.levelManager.advanceLevel();
+        this._spawnEnemyWave();
+        this._showLevelMessage();
+    }
+
+    _showLevelMessage() {
+        if (!this._levelMessageEl) return;
+
+        this._levelMessageEl.innerHTML = `
+            <span>NIVEL ${this.levelManager.level}</span>
+            <small>NOVA ONDA</small>
+        `;
+        this._levelMessageEl.classList.remove('active');
+        void this._levelMessageEl.offsetWidth;
+        this._levelMessageEl.classList.add('active');
+
+        window.clearTimeout(this._levelMessageTimer);
+        this._levelMessageTimer = window.setTimeout(() => {
+            this._levelMessageEl.classList.remove('active');
+        }, CONFIG.LEVELS.LEVEL_MESSAGE_TIME * 1000);
     }
 
     _spawnLifePickups() {
@@ -267,7 +391,9 @@ export class SceneManager {
                 if (!enemy.alive) continue;
                 if (proj.position.distanceTo(enemy.position) < CONFIG.Enemy.HIT_RADIUS) {
                     const result = enemy.takeDamage(1);
+                    this._handleEnemyAlert(enemy);
                     if (result === 'dead') {
+                        this.levelManager.registerKill();
                         this.score++;
                         this.audio.playDestroy();
                         this.wrecks.push(new Wreck(this.scene, enemy.position.clone()));
@@ -293,6 +419,7 @@ export class SceneManager {
                     this.scene.remove(proj);
                     enemy.projectiles.splice(i, 1);
                     this.lives = Math.max(0, this.lives - 1);
+                    this._triggerHitFlash();
                 }
             }
         }
@@ -365,6 +492,35 @@ export class SceneManager {
         document.getElementById('game-over').style.display  = 'flex';
     }
 
+    beginGame() {
+        this._gameActive = true;
+        this.clock.getDelta(); // descarta o delta acumulado durante o menu
+    }
+
+    _togglePause() {
+        if (!this._gameActive || this._gameOver) return;
+        this._paused ? this.resume() : this.pause();
+    }
+
+    pause() {
+        this._paused = true;
+        this._pauseEl.style.display = 'flex';
+        document.exitPointerLock?.();
+        this.clock.getDelta(); // descarta o delta acumulado durante a pausa
+    }
+
+    resume() {
+        this._paused = false;
+        this._pauseEl.style.display = 'none';
+    }
+
+    _triggerHitFlash() {
+        const el = this._hitFlashEl;
+        el.classList.remove('active');
+        void el.offsetWidth; // força reflow para reiniciar a animação
+        el.classList.add('active');
+    }
+
     _resolveStaticCollisions(tankPos, tankRadius = 3) {
         for (const col of this.environment.colliders) {
             const dx = tankPos.x - col.x;
@@ -380,30 +536,40 @@ export class SceneManager {
     }
 
     _update() {
-        if (this._gameOver) return;
+        if (!this._gameActive || this._gameOver || this._paused) return;
 
         const delta = this.clock.getDelta();
+
         this.player.update(delta);
 
-        // Câmara ortográfica segue o jogador mantendo a perspetiva top-down
+        // Câmara ortográfica do radar segue o jogador
         const p = this.player.tank.position;
         this.radarCamera.position.set(p.x, 1000, p.z);
         this.radarCamera.lookAt(p.x, 0, p.z);
 
         // Toggles de luz (teclas 1–4) — lidos e repostos a false no mesmo frame
         const t = this.inputHandler.toggles;
-        if (t.light1) { this.lighting.toggleAmbient();              t.light1 = false; }
-        if (t.light2) { this.lighting.toggleMoon();                  t.light2 = false; }
-        if (t.light3) { this.player.tankLight.visible = !this.player.tankLight.visible; t.light3 = false; }
-        if (t.light4) { this.lighting.toggleVolcano(); t.light4 = false; }
+        if (t.light1) { this.lighting.toggleAmbient();                                    t.light1 = false; }
+        if (t.light2) { this.lighting.toggleMoon();                                       t.light2 = false; }
+        if (t.light3) { this.player.tankLight.visible = !this.player.tankLight.visible;   t.light3 = false; }
+        if (t.light4) { this.lighting.toggleVolcano();                                    t.light4 = false; }
+
         this._resolveStaticCollisions(this.player.tank.position);
 
         for (const enemy of this.enemies) {
+            const wasAlerted = enemy.isAlerted();
             enemy.update(delta, this.player, this.environment.colliders);
+            if (!wasAlerted && enemy.isAlerted()) {
+                this._handleEnemyAlert(enemy);
+            }
             if (enemy.alive) this._resolveStaticCollisions(enemy.position);
         }
 
         this._checkCollisions();
+
+        if (this.enemies.length === 0) {
+            this._advanceLevel();
+        }
 
         for (const wreck of this.wrecks) wreck.update(delta);
         this.wrecks = this.wrecks.filter(w => w.alive);
@@ -415,6 +581,12 @@ export class SceneManager {
             return;
         }
 
-        this.hud.update(this.score, this.lives);
+        this.hud.update(
+            this.score,
+            this.lives,
+            this.levelManager.level,
+            this.levelManager.waveKilledEnemies,
+            this.levelManager.waveTotalEnemies
+        );
     }
 }

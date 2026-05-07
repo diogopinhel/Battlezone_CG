@@ -1,22 +1,31 @@
-/**
- * Ponto de entrada da aplicação Battlezone 3D.
- * 
- * Fase 1 (atual): base visual inicial com cena, câmara, renderer,
- * solo texturizado, nevoeiro de horizonte e iluminação fundamental.
- */
-
 import { SceneManager } from './scene/SceneManager.js';
 
-// Obter o canvas definido em index.html
 const canvas = document.getElementById('battlezone-canvas');
 
 if (!canvas) {
     console.error('Canvas não encontrado!');
 } else {
-    // Criar e iniciar a cena
+    const startMenu   = document.getElementById('start-menu');
+    const creditsOver = document.getElementById('credits-overlay');
+
+    // Cria e arranca a cena imediatamente para servir de fundo ao menu inicial
     const sceneManager = new SceneManager(canvas);
     sceneManager.start();
 
-    console.log('%c BATTLEZONE 3D — Fase 1 iniciada ', 
-        'background: #000; color: #00ff00; font-weight: bold; padding: 4px;');
+    document.getElementById('btn-start').addEventListener('click', () => {
+        startMenu.style.display = 'none';
+        sceneManager.beginGame();
+    });
+
+    document.getElementById('btn-credits').addEventListener('click', () => {
+        creditsOver.style.display = 'flex';
+    });
+
+    document.getElementById('btn-credits-back').addEventListener('click', () => {
+        creditsOver.style.display = 'none';
+    });
+
+    document.getElementById('btn-quit').addEventListener('click', () => {
+        window.close();
+    });
 }
