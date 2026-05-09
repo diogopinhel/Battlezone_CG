@@ -578,9 +578,6 @@ export class SceneManager {
         }
 
         this.hud.update(
-            this.player.tank.position,
-            this.player.tank.rotation.y,
-            this.enemies,
             this.score,
             this.lives,
             this.levelManager.level,
