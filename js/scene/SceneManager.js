@@ -40,8 +40,15 @@ export class SceneManager {
         this.lighting = new Lighting();
         this.lighting.addTo(this.scene);
 
+        // Câmara ortográfica para o radar top-down (semana 4)
+        this.radarCamera = this._createRadarCamera();
+
         this.environment = new Environment();
         this.environment.addTo(this.scene);
+
+        // Liga o material do vulcão ao Lighting para que toggleVolcano()
+        // controle simultaneamente PointLight + emissive do cone
+        this.lighting.setVolcanoMat(this.environment.volcanoMat);
 
         // Input, áudio e jogador
         this.inputHandler = new InputHandler();
@@ -124,17 +131,45 @@ export class SceneManager {
     _createRenderer() {
         const renderer = new THREE.WebGLRenderer({
             canvas: this.canvas,
-            antialias: true,        // Suavização de arestas
+            antialias: true,
         });
 
         renderer.setSize(window.innerWidth, window.innerHeight);
         renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 
-        // Ativar sombras (PCFSoft dá sombras suaves e realistas)
         renderer.shadowMap.enabled = true;
         renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
+        // Necessário para fazer dois passes de renderização por frame (vista
+        // principal + radar). Com autoClear=true, o segundo render.render()
+        // limparia o buffer inteiro e apagaria o primeiro passe.
+        renderer.autoClear = false;
+
         return renderer;
+    }
+
+    // ── Câmara ortográfica do radar ───────────────────────────────────────────
+    //
+    // OrthographicCamera não tem perspetiva: objetos próximos e distantes
+    // aparecem com o mesmo tamanho. É a projeção correta para um radar/mapa.
+    //
+    // Os parâmetros left/right/top/bottom definem quantas unidades do mundo
+    // cabem no ecrã. RADAR_HALF = 400 → vê 800×800 unidades à volta do jogador.
+    //
+    // up.set(0,0,-1): quando a câmara olha para baixo (−Y), precisamos dizer
+    // qual direção do mundo corresponde a "cima" no ecrã. Queremos que −Z
+    // (norte em Three.js) fique no topo do radar.
+
+    _createRadarCamera() {
+        const half = 400;
+        const cam = new THREE.OrthographicCamera(-half, half, half, -half, 1, 2000);
+        cam.up.set(0, 0, -1);
+        cam.position.set(0, 1000, 0);
+        cam.lookAt(0, 0, 0);
+        // Layer 1: marcadores radar (círculos coloridos sobre cada tanque).
+        // A câmara principal usa apenas a layer 0 (padrão), por isso nunca os vê.
+        cam.layers.enable(1);
+        return cam;
     }
 
     _onWindowResize() {
@@ -298,9 +333,50 @@ export class SceneManager {
         const animate = () => {
             requestAnimationFrame(animate);
             this._update();
-            this.renderer.render(this.scene, this.camera);
+            this._render();
         };
         animate();
+    }
+
+    // ── Dois passes de renderização por frame ─────────────────────────────────
+    //
+    // viewport + scissor limitam a área do canvas WebGL onde cada câmara desenha.
+    // scissorTest=true ativa a máscara; clearDepth() limpa o z-buffer dentro
+    // dessa área para que os objetos do segundo passe não sejam descartados por
+    // terem profundidade "atrás" dos objetos do primeiro passe.
+    //
+    // O Three.js chama background.render() no início de cada render(), que pinta
+    // a cor de fundo (preto) dentro do viewport/scissor ativo — por isso não
+    // precisamos de limpar a cor manualmente antes de cada passe.
+
+    _render() {
+        const w  = window.innerWidth;
+        const h  = window.innerHeight;
+        const rs = 200;   // tamanho do radar em píxeis
+        const m  = 10;    // margem em relação ao canto
+
+        this.renderer.setScissorTest(true);
+
+        // ── 1. Vista principal (perspetiva, ecrã inteiro) ─────────────────────
+        this.renderer.setViewport(0, 0, w, h);
+        this.renderer.setScissor(0, 0, w, h);
+        this.renderer.clearDepth();
+        this.renderer.render(this.scene, this.camera);
+
+        // ── 2. Radar (ortográfica, canto superior direito) ────────────────────
+        // CSS: top:10px, right:10px → WebGL (y a partir de baixo): x = w-rs-m, y = h-rs-m
+        // O nevoeiro é desligado temporariamente: a câmara está a y=1000, o que
+        // coloca tudo dentro do intervalo de fog (near=100), deixando o radar verde.
+        this.renderer.setViewport(w - rs - m, h - rs - m, rs, rs);
+        this.renderer.setScissor(w - rs - m, h - rs - m, rs, rs);
+        this.renderer.clearDepth();
+        const fog = this.scene.fog;
+        this.scene.fog = null;
+        this.renderer.render(this.scene, this.radarCamera);
+        this.scene.fog = fog;
+
+        this.renderer.setScissorTest(false);
+        this.renderer.setViewport(0, 0, w, h);
     }
 
     _checkCollisions() {

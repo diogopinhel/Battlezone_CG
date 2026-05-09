@@ -99,6 +99,17 @@ export class Enemy {
             group.add(track);
         }
 
+        // Marcador radar (layer 1) — círculo vermelho, invisível na vista FPS.
+        // O grupo tem scale 1.5, por isso usamos raio 13 → 13×1.5 ≈ 20 unidades no mundo.
+        const blip = new THREE.Mesh(
+            new THREE.CircleGeometry(13, 16),
+            new THREE.MeshBasicMaterial({ color: 0xff2222 })
+        );
+        blip.rotation.x = -Math.PI / 2;
+        blip.position.y = 1;
+        blip.layers.set(1);
+        group.add(blip);
+
         group.scale.setScalar(1.5);
         return group;
     }
