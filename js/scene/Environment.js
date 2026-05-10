@@ -115,36 +115,69 @@ export class Environment {
 
     _makeRock(scale) {
         const group = new THREE.Group();
-        const mat   = new THREE.LineBasicMaterial({ color: GREEN });
+        const mat = new THREE.MeshLambertMaterial({
+            map: this._getRockTexture(),
+            color: 0xd0d0d0,
+        });
 
         // Pedra principal
-        const main = new THREE.LineSegments(
-            new THREE.EdgesGeometry(new THREE.BoxGeometry(4, 2.2, 3)),
-            mat
+        const main = this._makeRoundedRockPart(3.2, mat);
+        main.position.y = 1.8;
+        main.scale.set(
+            THREE.MathUtils.randFloat(1.3, 1.8),
+            THREE.MathUtils.randFloat(0.65, 0.95),
+            THREE.MathUtils.randFloat(1.0, 1.45)
         );
-        main.position.y = 1.1;
-        main.rotation.y = Math.random() * Math.PI;
         group.add(main);
 
         // Pedra secundária deslocada
-        const sec = new THREE.LineSegments(
-            new THREE.EdgesGeometry(new THREE.BoxGeometry(2.5, 1.6, 2)),
-            mat
+        const sec = this._makeRoundedRockPart(2.2, mat);
+        sec.position.set(2.6, 1.0, 1.1);
+        sec.scale.set(
+            THREE.MathUtils.randFloat(1.0, 1.45),
+            THREE.MathUtils.randFloat(0.55, 0.85),
+            THREE.MathUtils.randFloat(0.85, 1.25)
         );
-        sec.position.set(2.2, 0.8, 1);
-        sec.rotation.y = Math.random() * Math.PI;
         group.add(sec);
 
-        // Topo angular (octaedro para variedade visual)
-        const cap = new THREE.LineSegments(
-            new THREE.EdgesGeometry(new THREE.OctahedronGeometry(1.2)),
-            mat
-        );
-        cap.position.set(-1.2, 2.6, -0.4);
-        group.add(cap);
+        // Fragmento superior/irregular para quebrar a silhueta
+        if (Math.random() < 0.75) {
+            const cap = this._makeRoundedRockPart(1.35, mat);
+            cap.position.set(-1.3, 3.0, -0.5);
+            cap.scale.set(
+                THREE.MathUtils.randFloat(0.8, 1.2),
+                THREE.MathUtils.randFloat(0.55, 0.8),
+                THREE.MathUtils.randFloat(0.8, 1.1)
+            );
+            group.add(cap);
+        }
 
         group.scale.setScalar(scale);
         return group;
+    }
+
+    _makeRoundedRockPart(radius, mat) {
+        const rock = new THREE.Mesh(new THREE.DodecahedronGeometry(radius, 0), mat);
+        rock.rotation.set(
+            Math.random() * Math.PI,
+            Math.random() * Math.PI,
+            Math.random() * Math.PI
+        );
+        rock.castShadow = true;
+        rock.receiveShadow = true;
+        return rock;
+    }
+
+    _getRockTexture() {
+        if (!this._rockTexture) {
+            this._rockTexture = new THREE.TextureLoader().load('./textures/ground_rock.jpg');
+            this._rockTexture.wrapS = THREE.RepeatWrapping;
+            this._rockTexture.wrapT = THREE.RepeatWrapping;
+            this._rockTexture.repeat.set(1.4, 1.4);
+            this._rockTexture.colorSpace = THREE.SRGBColorSpace;
+        }
+
+        return this._rockTexture;
     }
 
     _addRocks() {
@@ -152,7 +185,7 @@ export class Environment {
         for (let i = 0; i < count; i++) {
             const angle = Math.random() * Math.PI * 2;
             const dist  = 80 + Math.random() * 200;   // interior do mapa de jogo
-            const scale = 0.8 + Math.random() * 0.8;  // 0.8 – 1.6
+            const scale = 0.55 + Math.random() * 0.45; // 0.55 – 1.0
 
             const rock = this._makeRock(scale);
             const x = Math.cos(angle) * dist;
@@ -161,7 +194,7 @@ export class Environment {
             rock.rotation.y = Math.random() * Math.PI * 2;
             this.group.add(rock);
 
-            this.colliders.push({ x, z, radius: 5 * scale });
+            this.colliders.push({ x, z, radius: 4.2 * scale });
         }
     }
 
@@ -172,38 +205,44 @@ export class Environment {
     // A animação de erupção é adicionada na semana 7.
 
     _addVolcano() {
-        const { X, Z, BASE_RADIUS, HEIGHT } = CONFIG.VOLCANO;
+        const { X, Z, BASE_RADIUS, TOP_RADIUS, HEIGHT } = CONFIG.VOLCANO;
         const group = new THREE.Group();
+
+        const volcanoTexture = new THREE.TextureLoader().load('./textures/volcano_rock.jpg');
+        volcanoTexture.wrapS = THREE.RepeatWrapping;
+        volcanoTexture.wrapT = THREE.RepeatWrapping;
+        volcanoTexture.repeat.set(2, 2);
+        volcanoTexture.colorSpace = THREE.SRGBColorSpace;
 
         // Corpo principal — cone rochoso com emissive laranja-vermelho.
         // emissive: cor que o material emite por si próprio, sem depender de luzes externas.
         // Garante que o vulcão é claramente laranja mesmo onde a PointLight é fraca.
         const bodyMat = new THREE.MeshLambertMaterial({
-            color:             0x3a2010,
+            map:               volcanoTexture,
+            color:             0xffffff,
             emissive:          new THREE.Color(0xff2200),
-            emissiveIntensity: 0.45,
+            emissiveMap:       volcanoTexture,
+            emissiveIntensity: CONFIG.LIGHTS.VOLCANO_EMISSIVE_INTENSITY,
         });
-        const body = new THREE.Mesh(new THREE.ConeGeometry(BASE_RADIUS, HEIGHT, 14), bodyMat);
+        const volcanoGeo = new THREE.CylinderGeometry(TOP_RADIUS, BASE_RADIUS, HEIGHT, 14, 1, true);
+        const body = new THREE.Mesh(volcanoGeo, bodyMat);
         body.position.y = HEIGHT / 2;
         body.castShadow = true;
         body.receiveShadow = true;
         group.add(body);
 
-        // Anel da cratera no topo — torus ligeiramente mais escuro
-        const rimMat = new THREE.MeshLambertMaterial({ color: 0x150800 });
-        const rim = new THREE.Mesh(new THREE.TorusGeometry(13, 5, 8, 20), rimMat);
-        rim.position.y = HEIGHT - 6;
-        rim.receiveShadow = true;
-        group.add(rim);
+        this._buildVolcanoCrater(group, volcanoTexture);
 
         // Contorno wireframe verde (estética Battlezone) sobreposto ao cone
         const wireMat = new THREE.LineBasicMaterial({ color: GREEN, opacity: 0.4, transparent: true });
         const wire = new THREE.LineSegments(
-            new THREE.EdgesGeometry(new THREE.ConeGeometry(BASE_RADIUS, HEIGHT, 14)),
+            new THREE.EdgesGeometry(volcanoGeo),
             wireMat
         );
         wire.position.y = HEIGHT / 2;
         group.add(wire);
+
+        this._buildVolcanoSmoke(group);
 
         group.position.set(X, 0, Z);
         this.group.add(group);
@@ -215,7 +254,160 @@ export class Environment {
         this.colliders.push({ x: X, z: Z, radius: BASE_RADIUS });
     }
 
+    _buildVolcanoCrater(group, volcanoTexture) {
+        const { HEIGHT, TOP_RADIUS, CRATER_ROCK_COUNT } = CONFIG.VOLCANO;
+        const rockMat = new THREE.MeshLambertMaterial({
+            map: volcanoTexture,
+            color: 0xd0d0d0,
+            emissive: new THREE.Color(0x331000),
+            emissiveIntensity: CONFIG.LIGHTS.VOLCANO_EMISSIVE_INTENSITY * 0.45,
+        });
+
+        for (let i = 0; i < CRATER_ROCK_COUNT; i++) {
+            const angle = (i / CRATER_ROCK_COUNT) * Math.PI * 2 + THREE.MathUtils.randFloatSpread(0.14);
+            const radius = TOP_RADIUS + THREE.MathUtils.randFloat(1.5, 5.0);
+            const rockScale = THREE.MathUtils.randFloat(0.8, 1.45);
+            const geo = new THREE.DodecahedronGeometry(3.8 * rockScale, 0);
+            const rock = new THREE.Mesh(geo, rockMat);
+            rock.position.set(
+                Math.cos(angle) * radius,
+                HEIGHT + THREE.MathUtils.randFloat(-2.0, 2.5),
+                Math.sin(angle) * radius
+            );
+            rock.scale.set(
+                THREE.MathUtils.randFloat(1.15, 1.9),
+                THREE.MathUtils.randFloat(0.55, 1.0),
+                THREE.MathUtils.randFloat(0.9, 1.45)
+            );
+            rock.rotation.set(
+                Math.random() * Math.PI,
+                Math.random() * Math.PI,
+                Math.random() * Math.PI
+            );
+            rock.castShadow = true;
+            rock.receiveShadow = true;
+            group.add(rock);
+        }
+    }
+
+    _createSmokeTexture() {
+        const size = 96;
+        const canvas = document.createElement('canvas');
+        canvas.width = size;
+        canvas.height = size;
+
+        const ctx = canvas.getContext('2d');
+        const gradient = ctx.createRadialGradient(
+            size * 0.45,
+            size * 0.42,
+            size * 0.08,
+            size * 0.5,
+            size * 0.5,
+            size * 0.48
+        );
+
+        gradient.addColorStop(0.0, 'rgba(210, 210, 210, 0.75)');
+        gradient.addColorStop(0.45, 'rgba(150, 150, 150, 0.38)');
+        gradient.addColorStop(1.0, 'rgba(70, 70, 70, 0.0)');
+
+        ctx.fillStyle = gradient;
+        ctx.fillRect(0, 0, size, size);
+
+        const texture = new THREE.CanvasTexture(canvas);
+        texture.colorSpace = THREE.SRGBColorSpace;
+        return texture;
+    }
+
+    _buildVolcanoSmoke(group) {
+        const smokeTexture = this._createSmokeTexture();
+        this._smokeParticles = [];
+
+        for (let i = 0; i < CONFIG.VOLCANO.SMOKE_COUNT; i++) {
+            const material = new THREE.SpriteMaterial({
+                map: smokeTexture,
+                color: 0xb8b8b8,
+                transparent: true,
+                opacity: 0.0,
+                depthWrite: false,
+                fog: true,
+            });
+
+            const sprite = new THREE.Sprite(material);
+            group.add(sprite);
+
+            const particle = {
+                sprite,
+                material,
+                velocity: new THREE.Vector3(),
+                life: 0,
+                maxLife: 1,
+            };
+            this._smokeParticles.push(particle);
+            this._resetSmokeParticle(particle, true);
+        }
+    }
+
+    _resetSmokeParticle(particle, randomLife = false) {
+        const {
+            HEIGHT,
+            TOP_RADIUS,
+            SMOKE_LIFE_MIN,
+            SMOKE_LIFE_MAX,
+            SMOKE_RISE_SPEED,
+            SMOKE_DRIFT_SPEED,
+            SMOKE_START_SIZE,
+        } = CONFIG.VOLCANO;
+
+        const angle = Math.random() * Math.PI * 2;
+        const radius = Math.random() * TOP_RADIUS * 0.45;
+
+        particle.sprite.position.set(
+            Math.cos(angle) * radius,
+            HEIGHT + Math.random() * 6,
+            Math.sin(angle) * radius
+        );
+
+        particle.velocity.set(
+            (Math.random() - 0.5) * SMOKE_DRIFT_SPEED,
+            SMOKE_RISE_SPEED * (0.75 + Math.random() * 0.5),
+            (Math.random() - 0.5) * SMOKE_DRIFT_SPEED
+        );
+
+        particle.maxLife = THREE.MathUtils.lerp(SMOKE_LIFE_MIN, SMOKE_LIFE_MAX, Math.random());
+        particle.life = randomLife ? Math.random() * particle.maxLife : 0;
+        particle.sprite.scale.setScalar(SMOKE_START_SIZE);
+    }
+
+    _updateVolcanoSmoke(delta) {
+        if (!this._smokeParticles) return;
+
+        const { SMOKE_START_SIZE, SMOKE_END_SIZE } = CONFIG.VOLCANO;
+
+        for (const particle of this._smokeParticles) {
+            particle.life += delta;
+            if (particle.life >= particle.maxLife) {
+                this._resetSmokeParticle(particle);
+                continue;
+            }
+
+            const t = particle.life / particle.maxLife;
+            particle.sprite.position.addScaledVector(particle.velocity, delta);
+            particle.velocity.x *= 1 - 0.45 * delta;
+            particle.velocity.z *= 1 - 0.45 * delta;
+
+            const size = THREE.MathUtils.lerp(SMOKE_START_SIZE, SMOKE_END_SIZE, t);
+            particle.sprite.scale.set(size, size, 1);
+
+            particle.material.opacity = Math.sin(t * Math.PI) * 0.46;
+            particle.material.rotation += delta * 0.18;
+        }
+    }
+
     // ─────────────────────────────────────────────────────────────────────────
+
+    update(delta) {
+        this._updateVolcanoSmoke(delta);
+    }
 
     addTo(scene) {
         scene.add(this.group);

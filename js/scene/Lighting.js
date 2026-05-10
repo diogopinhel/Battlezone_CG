@@ -79,7 +79,9 @@ export class Lighting {
         // Sincroniza o emissive do cone: quando a luz está OFF o cone fica escuro;
         // quando está ON o cone volta a emitir laranja-vermelho.
         if (this._volcanoMat) {
-            this._volcanoMat.emissiveIntensity = this.volcanoLight.visible ? 0.45 : 0.0;
+            this._volcanoMat.emissiveIntensity = this.volcanoLight.visible
+                ? CONFIG.LIGHTS.VOLCANO_EMISSIVE_INTENSITY
+                : 0.0;
         }
     }
 

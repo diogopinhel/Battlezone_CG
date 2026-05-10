@@ -579,6 +579,8 @@ export class SceneManager {
 
         for (const pickup of this.lifePickups) pickup.update(delta);
 
+        this.environment.update(delta);
+
         if (this.lives <= 0) {
             this._showGameOver();
             return;

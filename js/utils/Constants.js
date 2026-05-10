@@ -41,6 +41,7 @@ export const CONFIG = {
         VOLCANO_COLOR:     0xff4400, // laranja-vermelho da lava
         VOLCANO_INTENSITY: 50.0,
         VOLCANO_DISTANCE:  700,
+        VOLCANO_EMISSIVE_INTENSITY: 0.3,
     },
 
     // Vulcão — posição fixa no mapa (partilhada por Environment e Lighting)
@@ -48,7 +49,16 @@ export const CONFIG = {
         X: 350,
         Z: -300,
         BASE_RADIUS: 60,
+        TOP_RADIUS: 17,
         HEIGHT: 130,
+        CRATER_ROCK_COUNT: 16,
+        SMOKE_COUNT: 28,
+        SMOKE_LIFE_MIN: 4.0,
+        SMOKE_LIFE_MAX: 6.5,
+        SMOKE_RISE_SPEED: 18,
+        SMOKE_DRIFT_SPEED: 8,
+        SMOKE_START_SIZE: 10,
+        SMOKE_END_SIZE: 46,
     },
 
     // Jogador / tanque
