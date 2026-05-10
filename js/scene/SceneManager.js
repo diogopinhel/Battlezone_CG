@@ -539,6 +539,13 @@ export class SceneManager {
         if (!this._gameActive || this._gameOver || this._paused) return;
 
         const delta = this.clock.getDelta();
+
+        const t = this.inputHandler.toggles;
+        if (t.light1) { this.lighting.toggleAmbient();                                  t.light1 = false; }
+        if (t.light2) { this.lighting.toggleMoon();                                     t.light2 = false; }
+        if (t.light3) { this.player.tankLight.visible = !this.player.tankLight.visible; t.light3 = false; }
+        if (t.light4) { this.lighting.toggleVolcano();                                  t.light4 = false; }
+
         const previousShotsFired = this.player.shotsFired;
 
         this.player.update(delta);
