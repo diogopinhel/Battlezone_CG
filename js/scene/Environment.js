@@ -63,31 +63,62 @@ export class Environment {
 
     // ── Trees ─────────────────────────────────────────────────────────────────
 
+    _getTreeBarkTexture() {
+        if (!this._treeBarkTexture) {
+            this._treeBarkTexture = new THREE.TextureLoader().load('./textures/ground_rock.jpg');
+            this._treeBarkTexture.wrapS = THREE.RepeatWrapping;
+            this._treeBarkTexture.wrapT = THREE.RepeatWrapping;
+            this._treeBarkTexture.repeat.set(1, 2);
+            this._treeBarkTexture.colorSpace = THREE.SRGBColorSpace;
+        }
+        return this._treeBarkTexture;
+    }
+
     _makeTree(scale) {
         const group = new THREE.Group();
-        const mat   = new THREE.LineBasicMaterial({ color: GREEN });
 
-        // Tronco
-        const trunk = new THREE.LineSegments(
-            new THREE.EdgesGeometry(new THREE.CylinderGeometry(0.35, 0.55, 4, 6)),
-            mat
-        );
+        // ── Materiais sólidos ─────────────────────────────────────────────────
+        // Tronco usa textura de rocha (simula casca rugosa) com tonalidade castanha.
+        // Copas usam verde escuro com emissive subtil para preservar a estética Battlezone.
+        const trunkMat = new THREE.MeshLambertMaterial({
+            map:   this._getTreeBarkTexture(),
+            color: 0x5a3010,
+        });
+        const foliageMat = new THREE.MeshLambertMaterial({
+            color:             0x0a3a0a,
+            emissive:          new THREE.Color(0x003300),
+            emissiveIntensity: 0.4,
+        });
+        // Wireframe verde subtil sobreposto — preserva a estética retro Battlezone
+        const wireMat = new THREE.LineBasicMaterial({ color: GREEN, transparent: true, opacity: 0.35 });
+
+        // ── Tronco ────────────────────────────────────────────────────────────
+        const trunkGeo = new THREE.CylinderGeometry(0.35, 0.55, 4, 6);
+        const trunk = new THREE.Mesh(trunkGeo, trunkMat);
         trunk.position.y = 2;
+        trunk.castShadow = true;
+        trunk.receiveShadow = true;
         group.add(trunk);
+        const trunkWire = new THREE.LineSegments(new THREE.EdgesGeometry(trunkGeo), wireMat);
+        trunkWire.position.y = 2;
+        group.add(trunkWire);
 
-        // 3 camadas de copa cónica
+        // ── 3 camadas de copa cónica ──────────────────────────────────────────
         const layers = [
             { r: 4.0, h: 4.5, y: 4.5 },
             { r: 2.8, h: 4.0, y: 7.5 },
             { r: 1.6, h: 3.5, y: 10.0 },
         ];
         for (const l of layers) {
-            const cone = new THREE.LineSegments(
-                new THREE.EdgesGeometry(new THREE.ConeGeometry(l.r, l.h, 7)),
-                mat
-            );
+            const coneGeo = new THREE.ConeGeometry(l.r, l.h, 7);
+            const cone = new THREE.Mesh(coneGeo, foliageMat);
             cone.position.y = l.y;
+            cone.castShadow = true;
+            cone.receiveShadow = true;
             group.add(cone);
+            const coneWire = new THREE.LineSegments(new THREE.EdgesGeometry(coneGeo), wireMat);
+            coneWire.position.y = l.y;
+            group.add(coneWire);
         }
 
         group.scale.setScalar(scale);
