@@ -540,19 +540,28 @@ export class SceneManager {
 
         const delta = this.clock.getDelta();
 
-        this.player.update(delta);
+        // Toggles de luz (teclas 1–4) — lidos e repostos a false no mesmo frame
+        const t = this.inputHandler.toggles;
+        if (t.light1) { this.lighting.toggleAmbient();                                  t.light1 = false; }
+        if (t.light2) { this.lighting.toggleMoon();                                     t.light2 = false; }
+        if (t.light3) { this.player.tankLight.visible = !this.player.tankLight.visible; t.light3 = false; }
+        if (t.light4) { this.lighting.toggleVolcano();                                  t.light4 = false; }
 
         // Câmara ortográfica do radar segue o jogador
         const p = this.player.tank.position;
         this.radarCamera.position.set(p.x, 1000, p.z);
         this.radarCamera.lookAt(p.x, 0, p.z);
 
-        // Toggles de luz (teclas 1–4) — lidos e repostos a false no mesmo frame
-        const t = this.inputHandler.toggles;
-        if (t.light1) { this.lighting.toggleAmbient();                                    t.light1 = false; }
-        if (t.light2) { this.lighting.toggleMoon();                                       t.light2 = false; }
-        if (t.light3) { this.player.tankLight.visible = !this.player.tankLight.visible;   t.light3 = false; }
-        if (t.light4) { this.lighting.toggleVolcano();                                    t.light4 = false; }
+        // Disparo do jogador alerta inimigos próximos (shot noise)
+        const previousShotsFired = this.player.shotsFired;
+        this.player.update(delta);
+        if (this.player.shotsFired > previousShotsFired && this.player.lastShotPosition) {
+            const difficulty = this.levelManager.getDifficulty();
+            this._alertNearbyEnemies(
+                this.player.lastShotPosition,
+                difficulty.shotNoiseRadius
+            );
+        }
 
         this._resolveStaticCollisions(this.player.tank.position);
 
@@ -576,6 +585,8 @@ export class SceneManager {
 
         for (const pickup of this.lifePickups) pickup.update(delta);
 
+        this.environment.update(delta);
+
         if (this.lives <= 0) {
             this._showGameOver();
             return;
@@ -585,6 +596,7 @@ export class SceneManager {
             this.score,
             this.lives,
             this.levelManager.level,
+            this.levelManager.getProgress(),
             this.levelManager.waveKilledEnemies,
             this.levelManager.waveTotalEnemies
         );
