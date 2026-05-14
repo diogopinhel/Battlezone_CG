@@ -74,7 +74,7 @@ export const CONFIG = {
         SHOOT_RANGE: 250,               // distancia maxima onde podem disparar em movimento
         SHOOT_ALIGNMENT: 0.85,          // exige estar quase apontado ao jogador antes de disparar
         PATROL_REACH_DISTANCE: 12,      // margem para considerar um ponto atingido
-        SPAWN_MIN_DISTANCE: 70,         // evita criar inimigos demasiado perto do jogador
+        SPAWN_MIN_DISTANCE: 60,         // evita criar inimigos demasiado perto do jogador
         HEALTH: 3,
         FIRE_COOLDOWN: 3.0,             // segundos entre disparos do inimigo
         PROJECTILE_SPEED: 60,           // unidades por segundo
@@ -89,8 +89,8 @@ export const CONFIG = {
         WAVE_ENEMY_COUNTS: [3, 4, 5, 5, 6, 6, 7, 8, 8, 9],
         MAX_ENEMY_COUNT: 10,             // limite para evitar ondas demasiado pesadas
         MAX_GROUP_SIZE: 3,               // tamanho maximo de uma patrulha
-        WAVE_SPAWN_MIN_DISTANCE: 210,    // distancia minima da patrulha ao jogador
-        WAVE_SPAWN_MAX_DISTANCE: 460,    // distancia maxima da patrulha ao jogador
+        WAVE_SPAWN_MIN_DISTANCE: 150,    // distancia minima da patrulha ao jogador
+        WAVE_SPAWN_MAX_DISTANCE: 300,    // distancia maxima da patrulha ao jogador
         GROUP_SPAWN_RADIUS: 32,          // dispersao inicial dos tanques dentro da patrulha
         GROUP_PATROL_RADIUS: 60,         // zona de patrulha de cada grupo
         ARMORED_ENEMY_START_LEVEL: 7,    // antes disto a vida extra ainda nao compensa
