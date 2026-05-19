@@ -50,6 +50,9 @@ export class SceneManager {
         // controle simultaneamente PointLight + emissive do cone
         this.lighting.setVolcanoMat(this.environment.volcanoMat);
 
+        // Liga a PointLight do vulcão ao Environment para o pulso durante a erupção
+        this.environment.setVolcanoLight(this.lighting.volcanoLight);
+
         // Input, áudio e jogador
         this.inputHandler = new InputHandler();
         this.audio = new AudioManager();
@@ -466,6 +469,70 @@ export class SceneManager {
             }
         }
 
+        // ── Erupção do vulcão ─────────────────────────────────────────────────
+        const phase = this.environment.currentEruptionPhase;
+        if (phase) {
+            const playerPos = this.player.tank.position;
+
+            // Pedras de lava que aterram — dano de impacto em área + criar poça
+            for (const rock of this.environment.lavaRocks) {
+                if (!rock.impacted || rock.handled) continue;
+                rock.handled = true;   // marca para remoção pelo Environment
+
+                const impactPos = rock.mesh.position.clone();
+                this.audio.playEruptionImpact();
+
+                // Dano ao jogador
+                if (impactPos.distanceTo(playerPos) < phase.impactRadius) {
+                    this.lives = Math.max(0, this.lives - phase.impactDamage);
+                    this._triggerHitFlash();
+                }
+
+                // Dano aos inimigos
+                for (const enemy of this.enemies) {
+                    if (!enemy.alive) continue;
+                    if (impactPos.distanceTo(enemy.position) < phase.impactRadius) {
+                        const result = enemy.takeDamage(phase.impactDamage);
+                        if (result === 'dead') {
+                            this.levelManager.registerKill();
+                            this.score++;
+                            this.audio.playDestroy();
+                            this.wrecks.push(new Wreck(this.scene, enemy.position.clone()));
+                        }
+                    }
+                }
+
+                // Cria poça se ainda não atingiu o limite
+                if (this.environment.lavaPools.length < phase.maxActivePools) {
+                    this.environment.spawnLavaPool(impactPos, phase.poolRadius, phase.poolDuration);
+                }
+            }
+
+            // Dano progressivo das poças de lava
+            for (const pool of this.environment.lavaPools) {
+                if (playerPos.distanceTo(pool.mesh.position) < pool.radius) {
+                    this.lives = Math.max(0, this.lives - phase.poolDamagePerSecond * this._lastDelta);
+                    this._triggerHitFlash();
+                }
+                for (const enemy of this.enemies) {
+                    if (!enemy.alive) continue;
+                    if (enemy.position.distanceTo(pool.mesh.position) < pool.radius) {
+                        enemy.lavaDamageAccum = (enemy.lavaDamageAccum ?? 0) + phase.poolDamagePerSecond * this._lastDelta;
+                        if (enemy.lavaDamageAccum >= 1) {
+                            const result = enemy.takeDamage(1);
+                            enemy.lavaDamageAccum = 0;
+                            if (result === 'dead') {
+                                this.levelManager.registerKill();
+                                this.score++;
+                                this.audio.playDestroy();
+                                this.wrecks.push(new Wreck(this.scene, enemy.position.clone()));
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         // Vidas no mapa — jogador passa por cima para apanhar
         for (let i = this.lifePickups.length - 1; i >= 0; i--) {
             if (this.lifePickups[i].checkCollect(this.player.tank.position)) {
@@ -478,6 +545,27 @@ export class SceneManager {
 
         // Remove inimigos destruidos da lista
         this.enemies = this.enemies.filter(e => e.alive);
+    }
+
+    // ── Wireframe toggle ──────────────────────────────────────────────────────
+    //
+    // Percorre todos os Mesh da cena e alterna material.wireframe.
+    // Materiais excluídos: LineBasicMaterial (já são linhas), SpriteMaterial
+    // (partículas de fumo/halo), MeshBasicMaterial sem map (blips, poças de lava,
+    // projéteis) — para não estragar elementos que já são "2D" ou decorativos.
+
+    _toggleWireframe() {
+        this._wireframeActive = !this._wireframeActive;
+        this.scene.traverse(obj => {
+            if (!(obj instanceof THREE.Mesh)) return;
+            const mat = obj.material;
+            // Só alterna materiais Lambert e Phong — são os sólidos com geometria 3D real
+            if (mat instanceof THREE.MeshLambertMaterial ||
+                mat instanceof THREE.MeshPhongMaterial   ||
+                mat instanceof THREE.MeshStandardMaterial) {
+                mat.wireframe = this._wireframeActive;
+            }
+        });
     }
 
     _showGameOver() {
@@ -539,13 +627,15 @@ export class SceneManager {
         if (!this._gameActive || this._gameOver || this._paused) return;
 
         const delta = this.clock.getDelta();
+        this._lastDelta = delta;   // guardado para uso em _checkCollisions (dano progressivo)
 
-        // Toggles de luz (teclas 1–4) — lidos e repostos a false no mesmo frame
+        // Toggles de luz (teclas 1–4) e wireframe (tecla 5)
         const t = this.inputHandler.toggles;
-        if (t.light1) { this.lighting.toggleAmbient();                                  t.light1 = false; }
-        if (t.light2) { this.lighting.toggleMoon();                                     t.light2 = false; }
-        if (t.light3) { this.player.tankLight.visible = !this.player.tankLight.visible; t.light3 = false; }
-        if (t.light4) { this.lighting.toggleVolcano();                                  t.light4 = false; }
+        if (t.light1)    { this.lighting.toggleAmbient();                                  t.light1    = false; }
+        if (t.light2)    { this.lighting.toggleMoon();                                     t.light2    = false; }
+        if (t.light3)    { this.player.tankLight.visible = !this.player.tankLight.visible; t.light3    = false; }
+        if (t.light4)    { this.lighting.toggleVolcano();                                  t.light4    = false; }
+        if (t.wireframe) { this._toggleWireframe();                                        t.wireframe = false; }
 
         // Câmara ortográfica do radar segue o jogador
         const p = this.player.tank.position;
@@ -567,7 +657,7 @@ export class SceneManager {
 
         for (const enemy of this.enemies) {
             const wasAlerted = enemy.isAlerted();
-            enemy.update(delta, this.player, this.environment.colliders);
+            enemy.update(delta, this.player, this.environment.colliders, this.environment.lavaPools);
             if (!wasAlerted && enemy.isAlerted()) {
                 this._handleEnemyAlert(enemy);
             }
@@ -585,7 +675,8 @@ export class SceneManager {
 
         for (const pickup of this.lifePickups) pickup.update(delta);
 
-        this.environment.update(delta);
+        this.environment.update(delta, this.levelManager.level);
+        if (this.environment.justBursted) this.audio.playEruptionLaunch();
 
         if (this.lives <= 0) {
             this._showGameOver();
