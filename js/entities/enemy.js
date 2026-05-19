@@ -374,7 +374,7 @@ export class Enemy {
     }
 
     // colliders: array de {x, z, radius} do Environment, passado pelo SceneManager
-    update(delta, player, colliders) {
+    update(delta, player, colliders, lavaPools = []) {
         if (!this.alive) return;
 
         this._colliders = colliders;
@@ -401,6 +401,26 @@ export class Enemy {
             this._updateAttack(delta, player);
         } else {
             this._updatePatrol(delta);
+        }
+
+        // Desvio das poças de lava — aplicado após o movimento normal
+        this._avoidLavaPools(lavaPools);
+    }
+
+    // Empurra o inimigo para fora de qualquer poça de lava ativa.
+    // A margem extra (+6) faz o desvio começar antes de entrar na poça.
+    _avoidLavaPools(pools) {
+        for (const pool of pools) {
+            const dx   = this.position.x - pool.mesh.position.x;
+            const dz   = this.position.z - pool.mesh.position.z;
+            const dist = Math.sqrt(dx * dx + dz * dz);
+            const avoidRadius = pool.radius + 6;
+
+            if (dist < avoidRadius && dist > 0) {
+                const strength = (avoidRadius - dist) / avoidRadius;
+                this.position.x += (dx / dist) * strength * 4;
+                this.position.z += (dz / dist) * strength * 4;
+            }
         }
     }
 

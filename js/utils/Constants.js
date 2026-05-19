@@ -59,6 +59,53 @@ export const CONFIG = {
         SMOKE_DRIFT_SPEED: 8,
         SMOKE_START_SIZE: 10,
         SMOKE_END_SIZE: 46,
+
+        ERUPTION: {
+            START_LEVEL: 3,         // nível a partir do qual a erupção começa
+            GRAVITY: 40,            // aceleração gravitacional das pedras (unidades/s²)
+
+            PHASES: [
+                // Fase 1 — Ativo (níveis 3–5)
+                {
+                    rocksPerBurst:       2,
+                    burstInterval:       17,
+                    rockSpeed:           60,
+                    impactRadius:        12,
+                    impactDamage:        1,
+                    poolRadius:          10,
+                    poolDuration:        6,
+                    poolDamagePerSecond: 0.8,
+                    maxActivePools:      3,
+                    lightPulseIntensity: 20,
+                },
+                // Fase 2 — Intenso (níveis 6–8)
+                {
+                    rocksPerBurst:       4,
+                    burstInterval:       10,
+                    rockSpeed:           75,
+                    impactRadius:        16,
+                    impactDamage:        1,
+                    poolRadius:          14,
+                    poolDuration:        8,
+                    poolDamagePerSecond: 1.2,
+                    maxActivePools:      6,
+                    lightPulseIntensity: 45,
+                },
+                // Fase 3 — Fúria (nível 9+)
+                {
+                    rocksPerBurst:       8,
+                    burstInterval:       5,
+                    rockSpeed:           95,
+                    impactRadius:        22,
+                    impactDamage:        1,
+                    poolRadius:          18,
+                    poolDuration:        10,
+                    poolDamagePerSecond: 1.8,
+                    maxActivePools:      10,
+                    lightPulseIntensity: 80,
+                },
+            ],
+        },
     },
 
     // Jogador / tanque

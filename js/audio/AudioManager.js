@@ -133,4 +133,88 @@ export class AudioManager {
         osc.start(now);
         osc.stop(now + 0.45);
     }
+
+    // Som grave e profundo ao lançar pedras de lava
+    playEruptionLaunch() {
+        const ctx = this._getCtx();
+        const now = ctx.currentTime;
+
+        const osc  = ctx.createOscillator();
+        const gain = ctx.createGain();
+
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(200, now);
+        osc.frequency.exponentialRampToValueAtTime(55, now + 1.1);
+
+        gain.gain.setValueAtTime(0.55, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 1.1);
+
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(now);
+        osc.stop(now + 1.1);
+
+        // Camada de ruído grave — dá textura rochosa ao som
+        const bufSize = Math.floor(ctx.sampleRate * 0.5);
+        const buffer  = ctx.createBuffer(1, bufSize, ctx.sampleRate);
+        const data    = buffer.getChannelData(0);
+        for (let i = 0; i < bufSize; i++) {
+            data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (bufSize * 0.35));
+        }
+        const noise   = ctx.createBufferSource();
+        noise.buffer  = buffer;
+        const lp      = ctx.createBiquadFilter();
+        lp.type       = 'lowpass';
+        lp.frequency.value = 180;
+        const nGain   = ctx.createGain();
+        nGain.gain.setValueAtTime(0.35, now);
+        nGain.gain.exponentialRampToValueAtTime(0.001, now + 0.5);
+        noise.connect(lp);
+        lp.connect(nGain);
+        nGain.connect(ctx.destination);
+        noise.start(now);
+    }
+
+    // Explosão seca ao impactar no chão
+    playEruptionImpact() {
+        const ctx      = this._getCtx();
+        const now      = ctx.currentTime;
+        const duration = 0.5;
+
+        const bufSize = Math.floor(ctx.sampleRate * duration);
+        const buffer  = ctx.createBuffer(1, bufSize, ctx.sampleRate);
+        const data    = buffer.getChannelData(0);
+        for (let i = 0; i < bufSize; i++) {
+            data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (bufSize * 0.1));
+        }
+
+        const source = ctx.createBufferSource();
+        source.buffer = buffer;
+
+        const lp = ctx.createBiquadFilter();
+        lp.type  = 'lowpass';
+        lp.frequency.value = 380;
+
+        const gain = ctx.createGain();
+        gain.gain.setValueAtTime(1.1, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
+
+        source.connect(lp);
+        lp.connect(gain);
+        gain.connect(ctx.destination);
+        source.start(now);
+
+        // Thud grave de impacto
+        const osc     = ctx.createOscillator();
+        const oscGain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(90, now);
+        osc.frequency.exponentialRampToValueAtTime(20, now + 0.35);
+        oscGain.gain.setValueAtTime(0.5, now);
+        oscGain.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
+        osc.connect(oscGain);
+        oscGain.connect(ctx.destination);
+        osc.start(now);
+        osc.stop(now + 0.35);
+    }
 }
