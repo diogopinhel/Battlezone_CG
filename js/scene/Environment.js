@@ -63,31 +63,112 @@ export class Environment {
 
     // ── Trees ─────────────────────────────────────────────────────────────────
 
+    _getTreeBarkTexture() {
+        if (!this._treeBarkTexture) {
+            this._treeBarkTexture = this._createBarkTexture();
+        }
+        return this._treeBarkTexture;
+    }
+
+    // Textura de cascalho/casca gerada proceduralmente via Canvas 2D.
+    // Preenche o canvas com grãos de tamanho e cor aleatórios em tons terrosos,
+    // depois sobrepõe linhas verticais subtis para simular ranhuras de casca.
+    _createBarkTexture() {
+        const W = 128, H = 256;
+        const canvas = document.createElement('canvas');
+        canvas.width  = W;
+        canvas.height = H;
+        const ctx = canvas.getContext('2d');
+
+        // Fundo base — castanho escuro
+        ctx.fillStyle = '#2e1a0a';
+        ctx.fillRect(0, 0, W, H);
+
+        // Grãos de cascalho — elipses pequenas em tons terrosos variados
+        const grainColors = ['#5a3210', '#6b3d14', '#3d2008', '#7a4820', '#4a2a0e', '#8a5528'];
+        for (let i = 0; i < 1800; i++) {
+            const x  = Math.random() * W;
+            const y  = Math.random() * H;
+            const rw = 1.5 + Math.random() * 4.5;
+            const rh = 1.0 + Math.random() * 3.0;
+            const color = grainColors[Math.floor(Math.random() * grainColors.length)];
+
+            ctx.save();
+            ctx.translate(x, y);
+            ctx.rotate(Math.random() * Math.PI);
+            ctx.fillStyle = color;
+            ctx.globalAlpha = 0.55 + Math.random() * 0.45;
+            ctx.beginPath();
+            ctx.ellipse(0, 0, rw, rh, 0, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
+        }
+
+        // Ranhuras verticais subtis — simulam a textura fibrosa da casca
+        ctx.globalAlpha = 0.18;
+        for (let i = 0; i < 18; i++) {
+            const x = Math.random() * W;
+            ctx.strokeStyle = Math.random() > 0.5 ? '#1a0a00' : '#8a5528';
+            ctx.lineWidth = 0.5 + Math.random() * 1.5;
+            ctx.beginPath();
+            ctx.moveTo(x + (Math.random() - 0.5) * 4, 0);
+            ctx.lineTo(x + (Math.random() - 0.5) * 4, H);
+            ctx.stroke();
+        }
+
+        const texture = new THREE.CanvasTexture(canvas);
+        texture.wrapS = THREE.RepeatWrapping;
+        texture.wrapT = THREE.RepeatWrapping;
+        texture.repeat.set(1, 2);
+        texture.colorSpace = THREE.SRGBColorSpace;
+        return texture;
+    }
+
     _makeTree(scale) {
         const group = new THREE.Group();
-        const mat   = new THREE.LineBasicMaterial({ color: GREEN });
 
-        // Tronco
-        const trunk = new THREE.LineSegments(
-            new THREE.EdgesGeometry(new THREE.CylinderGeometry(0.35, 0.55, 4, 6)),
-            mat
-        );
+        // ── Materiais sólidos ─────────────────────────────────────────────────
+        // Tronco usa textura de rocha (simula casca rugosa) com tonalidade castanha.
+        // Copas usam verde escuro com emissive subtil para preservar a estética Battlezone.
+        const trunkMat = new THREE.MeshLambertMaterial({
+            map:   this._getTreeBarkTexture(),
+            color: 0x5a3010,
+        });
+        const foliageMat = new THREE.MeshLambertMaterial({
+            color:             0x0a3a0a,
+            emissive:          new THREE.Color(0x003300),
+            emissiveIntensity: 0.4,
+        });
+        // Wireframe verde subtil sobreposto — preserva a estética retro Battlezone
+        const wireMat = new THREE.LineBasicMaterial({ color: GREEN, transparent: true, opacity: 0.35 });
+
+        // ── Tronco ────────────────────────────────────────────────────────────
+        const trunkGeo = new THREE.CylinderGeometry(0.35, 0.55, 4, 6);
+        const trunk = new THREE.Mesh(trunkGeo, trunkMat);
         trunk.position.y = 2;
+        trunk.castShadow = true;
+        trunk.receiveShadow = true;
         group.add(trunk);
+        const trunkWire = new THREE.LineSegments(new THREE.EdgesGeometry(trunkGeo), wireMat);
+        trunkWire.position.y = 2;
+        group.add(trunkWire);
 
-        // 3 camadas de copa cónica
+        // ── 3 camadas de copa cónica ──────────────────────────────────────────
         const layers = [
             { r: 4.0, h: 4.5, y: 4.5 },
             { r: 2.8, h: 4.0, y: 7.5 },
             { r: 1.6, h: 3.5, y: 10.0 },
         ];
         for (const l of layers) {
-            const cone = new THREE.LineSegments(
-                new THREE.EdgesGeometry(new THREE.ConeGeometry(l.r, l.h, 7)),
-                mat
-            );
+            const coneGeo = new THREE.ConeGeometry(l.r, l.h, 7);
+            const cone = new THREE.Mesh(coneGeo, foliageMat);
             cone.position.y = l.y;
+            cone.castShadow = true;
+            cone.receiveShadow = true;
             group.add(cone);
+            const coneWire = new THREE.LineSegments(new THREE.EdgesGeometry(coneGeo), wireMat);
+            coneWire.position.y = l.y;
+            group.add(coneWire);
         }
 
         group.scale.setScalar(scale);
