@@ -23,7 +23,8 @@ export class Enemy {
         this.projectiles = [];
         this._fireCooldown = this._getFireCooldown();
         this._patrolTarget = this._createPatrolTarget();
-        this._alerted = options.startsAlerted ?? false;
+        this._alerted      = options.startsAlerted ?? false;
+        this._radarAlerted = false;   // alerta forçado pela torre de radar (não expira por distância)
         this._lastKnownPlayerPosition = null;
         this._bodyMat = null;
 
@@ -58,6 +59,19 @@ export class Enemy {
         this._alerted = true;
         if (playerPosition) {
             this._lastKnownPlayerPosition = playerPosition.clone();
+        }
+    }
+
+    /**
+     * Alerta forçado pela torre de radar — diferente do alerta normal porque:
+     *  • ignora a distância de deteção (vem atrás do jogador independentemente)
+     *  • não expira por distância, só por tempo (gerido pelo SceneManager)
+     */
+    forceAlert(targetPosition) {
+        this._alerted      = true;
+        this._radarAlerted = true;
+        if (targetPosition) {
+            this._lastKnownPlayerPosition = targetPosition.clone();
         }
     }
 
@@ -374,7 +388,7 @@ export class Enemy {
     }
 
     // colliders: array de {x, z, radius} do Environment, passado pelo SceneManager
-    update(delta, player, colliders) {
+    update(delta, player, colliders, lavaPools = []) {
         if (!this.alive) return;
 
         this._colliders = colliders;
@@ -401,6 +415,26 @@ export class Enemy {
             this._updateAttack(delta, player);
         } else {
             this._updatePatrol(delta);
+        }
+
+        // Desvio das poças de lava — aplicado após o movimento normal
+        this._avoidLavaPools(lavaPools);
+    }
+
+    // Empurra o inimigo para fora de qualquer poça de lava ativa.
+    // A margem extra (+6) faz o desvio começar antes de entrar na poça.
+    _avoidLavaPools(pools) {
+        for (const pool of pools) {
+            const dx   = this.position.x - pool.mesh.position.x;
+            const dz   = this.position.z - pool.mesh.position.z;
+            const dist = Math.sqrt(dx * dx + dz * dz);
+            const avoidRadius = pool.radius + 6;
+
+            if (dist < avoidRadius && dist > 0) {
+                const strength = (avoidRadius - dist) / avoidRadius;
+                this.position.x += (dx / dist) * strength * 4;
+                this.position.z += (dz / dist) * strength * 4;
+            }
         }
     }
 

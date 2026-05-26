@@ -69,7 +69,12 @@
                     <div id="hud-progress-fill"></div>
                 </div>
             </div>
+            <!-- Barra de scan da torre de radar (visível apenas quando o feixe está sobre o jogador) -->
+            <div id="hud-scan" style="display:none"></div>
         </div>
+
+        <!-- Alerta da torre de radar (centrado no ecrã, aparece após deteção confirmada) -->
+        <div id="radar-alert"></div>
 
         <!-- Canto superior direito: moldura do radar (o Three.js renderiza dentro via viewport) -->
         <div id="hud-radar-frame">

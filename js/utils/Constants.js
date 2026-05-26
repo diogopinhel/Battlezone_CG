@@ -59,6 +59,53 @@ export const CONFIG = {
         SMOKE_DRIFT_SPEED: 8,
         SMOKE_START_SIZE: 10,
         SMOKE_END_SIZE: 46,
+
+        ERUPTION: {
+            START_LEVEL: 3,         // nível a partir do qual a erupção começa
+            GRAVITY: 40,            // aceleração gravitacional das pedras (unidades/s²)
+
+            PHASES: [
+                // Fase 1 — Ativo (níveis 3–5)
+                {
+                    rocksPerBurst:       2,
+                    burstInterval:       17,
+                    rockSpeed:           60,
+                    impactRadius:        12,
+                    impactDamage:        1,
+                    poolRadius:          10,
+                    poolDuration:        6,
+                    poolDamagePerSecond: 0.8,
+                    maxActivePools:      3,
+                    lightPulseIntensity: 20,
+                },
+                // Fase 2 — Intenso (níveis 6–8)
+                {
+                    rocksPerBurst:       4,
+                    burstInterval:       10,
+                    rockSpeed:           75,
+                    impactRadius:        16,
+                    impactDamage:        1,
+                    poolRadius:          14,
+                    poolDuration:        8,
+                    poolDamagePerSecond: 1.2,
+                    maxActivePools:      6,
+                    lightPulseIntensity: 45,
+                },
+                // Fase 3 — Fúria (nível 9+)
+                {
+                    rocksPerBurst:       8,
+                    burstInterval:       5,
+                    rockSpeed:           95,
+                    impactRadius:        22,
+                    impactDamage:        1,
+                    poolRadius:          18,
+                    poolDuration:        10,
+                    poolDamagePerSecond: 1.8,
+                    maxActivePools:      10,
+                    lightPulseIntensity: 80,
+                },
+            ],
+        },
     },
 
     // Jogador / tanque
@@ -113,5 +160,28 @@ export const CONFIG = {
     // Radar / minimapa
     RADAR: {
         RANGE: 1000,  // mostra o mapa completo (ground = 2000×2000, half = 1000)
+    },
+
+    // Torre de radar inimiga — instalação de vigilância fixa no mapa
+    //
+    // Restrição obrigatória para o scan ser possível num alvo parado:
+    //   (BEAM_HALF_ANGLE × 2) / DISH_ROTATION_SPEED  ≥  SCAN_TIME
+    //   (0.30 × 2) / 0.22 = 2.7 s  ≥  1.0 s  ✓
+    RADAR_TOWER: {
+        X: -160,                    // mais perto do centro (≈ 205 u da origem)
+        Z:  130,
+        HEALTH: 3,                  // tiros para destruir
+        DISH_ROTATION_SPEED: 0.22,  // rad/s — rotação lenta (~28 s por volta completa)
+        DISH_SCAN_SPEED_MULT: 1.6,  // acelera ligeiramente ao detetar
+        DISH_COOLDOWN_SPEED_MULT: 0.25,
+        BEAM_HALF_ANGLE: 0.30,      // metade do ângulo do cone (≈17°) — mais largo e visível
+        BEAM_RANGE: 220,            // alcance reduzido → cone visualmente razoável
+        SCAN_TIME: 1.0,             // segundos para confirmar deteção
+        ALERT_DURATION: 60,         // segundos de alerta forçado nos inimigos
+        COOLDOWN: 180,              // segundos de cooldown após deteção
+        REINFORCEMENT_BASE: 2,      // inimigos extra na 1.ª deteção
+        REINFORCEMENT_STEP: 1,      // inimigos extra adicionais por deteção seguinte
+        DESTROY_SCORE: 50,          // pontos bónus ao destruir a torre
+        BODY_RADIUS: 8,             // raio de colisão física da torre
     },
 };

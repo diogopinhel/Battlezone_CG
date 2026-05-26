@@ -11,6 +11,7 @@ import { Wreck } from '../entities/Wreck.js';
 import { LifePickup } from '../entities/LifePickup.js';
 import { HUD } from '../ui/HUD.js';
 import { AudioManager } from '../audio/AudioManager.js';
+import { RadarTower } from './RadarTower.js';
 
 /**
  * Classe central que gere a cena three.js.
@@ -50,6 +51,9 @@ export class SceneManager {
         // controle simultaneamente PointLight + emissive do cone
         this.lighting.setVolcanoMat(this.environment.volcanoMat);
 
+        // Liga a PointLight do vulcão ao Environment para o pulso durante a erupção
+        this.environment.setVolcanoLight(this.lighting.volcanoLight);
+
         // Input, áudio e jogador
         this.inputHandler = new InputHandler();
         this.audio = new AudioManager();
@@ -66,12 +70,24 @@ export class SceneManager {
         this._spawnEnemyWave();
         this._spawnLifePickups();
 
+        // Torre de radar inimiga
+        this.radarTower = new RadarTower();
+        this.radarTower.addTo(this.scene);
+        // Adiciona o colider da torre à lista de obstáculos estáticos do environment
+        // (para colisão física dos tanques e projéteis inimigos)
+        this.environment.colliders.push(this.radarTower.collider);
+
+        // Estado do alerta do radar (gestão do timer do ALERTED_BY_RADAR)
+        this._radarAlertActive = false;
+        this._radarAlertTimer  = 0;
+
         // HUD
         this.hud = new HUD();
 
         // Flash ao ser atingido
         this._hitFlashEl = document.getElementById('hit-flash');
         this._levelMessageEl = document.getElementById('level-message');
+        this._radarAlertEl   = document.getElementById('radar-alert');
 
         // Estado de game over, pausa e início
         this._gameActive = false;
@@ -434,6 +450,29 @@ export class SceneManager {
             }
         }
 
+        // ── Projéteis do jogador contra a torre de radar ──────────────────────
+        // (verificado antes do loop de obstáculos estáticos para poder aplicar
+        //  takeDamage; o projétil é removido aqui e não voltará a ser processado)
+        if (this.radarTower.state !== 'destroyed') {
+            const col = this.radarTower.collider;
+            for (let i = this.player.projectiles.length - 1; i >= 0; i--) {
+                const proj = this.player.projectiles[i];
+                const dx = proj.position.x - col.x;
+                const dz = proj.position.z - col.z;
+                if (dx * dx + dz * dz < col.radius * col.radius) {
+                    this.radarTower.takeDamage(1);
+                    this.audio.playHit();
+                    this.scene.remove(proj);
+                    this.player.projectiles.splice(i, 1);
+
+                    if (this.radarTower.state === 'destroyed') {
+                        this.score += CONFIG.RADAR_TOWER.DESTROY_SCORE;
+                        this.audio.playDestroy();
+                    }
+                }
+            }
+        }
+
         // Projeteis contra obstaculos estaticos (pedras e arvores)
         const colliders = this.environment.colliders;
 
@@ -466,6 +505,70 @@ export class SceneManager {
             }
         }
 
+        // ── Erupção do vulcão ─────────────────────────────────────────────────
+        const phase = this.environment.currentEruptionPhase;
+        if (phase) {
+            const playerPos = this.player.tank.position;
+
+            // Pedras de lava que aterram — dano de impacto em área + criar poça
+            for (const rock of this.environment.lavaRocks) {
+                if (!rock.impacted || rock.handled) continue;
+                rock.handled = true;   // marca para remoção pelo Environment
+
+                const impactPos = rock.mesh.position.clone();
+                this.audio.playEruptionImpact();
+
+                // Dano ao jogador
+                if (impactPos.distanceTo(playerPos) < phase.impactRadius) {
+                    this.lives = Math.max(0, this.lives - phase.impactDamage);
+                    this._triggerHitFlash();
+                }
+
+                // Dano aos inimigos
+                for (const enemy of this.enemies) {
+                    if (!enemy.alive) continue;
+                    if (impactPos.distanceTo(enemy.position) < phase.impactRadius) {
+                        const result = enemy.takeDamage(phase.impactDamage);
+                        if (result === 'dead') {
+                            this.levelManager.registerKill();
+                            this.score++;
+                            this.audio.playDestroy();
+                            this.wrecks.push(new Wreck(this.scene, enemy.position.clone()));
+                        }
+                    }
+                }
+
+                // Cria poça se ainda não atingiu o limite
+                if (this.environment.lavaPools.length < phase.maxActivePools) {
+                    this.environment.spawnLavaPool(impactPos, phase.poolRadius, phase.poolDuration);
+                }
+            }
+
+            // Dano progressivo das poças de lava
+            for (const pool of this.environment.lavaPools) {
+                if (playerPos.distanceTo(pool.mesh.position) < pool.radius) {
+                    this.lives = Math.max(0, this.lives - phase.poolDamagePerSecond * this._lastDelta);
+                    this._triggerHitFlash();
+                }
+                for (const enemy of this.enemies) {
+                    if (!enemy.alive) continue;
+                    if (enemy.position.distanceTo(pool.mesh.position) < pool.radius) {
+                        enemy.lavaDamageAccum = (enemy.lavaDamageAccum ?? 0) + phase.poolDamagePerSecond * this._lastDelta;
+                        if (enemy.lavaDamageAccum >= 1) {
+                            const result = enemy.takeDamage(1);
+                            enemy.lavaDamageAccum = 0;
+                            if (result === 'dead') {
+                                this.levelManager.registerKill();
+                                this.score++;
+                                this.audio.playDestroy();
+                                this.wrecks.push(new Wreck(this.scene, enemy.position.clone()));
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         // Vidas no mapa — jogador passa por cima para apanhar
         for (let i = this.lifePickups.length - 1; i >= 0; i--) {
             if (this.lifePickups[i].checkCollect(this.player.tank.position)) {
@@ -478,6 +581,27 @@ export class SceneManager {
 
         // Remove inimigos destruidos da lista
         this.enemies = this.enemies.filter(e => e.alive);
+    }
+
+    // ── Wireframe toggle ──────────────────────────────────────────────────────
+    //
+    // Percorre todos os Mesh da cena e alterna material.wireframe.
+    // Materiais excluídos: LineBasicMaterial (já são linhas), SpriteMaterial
+    // (partículas de fumo/halo), MeshBasicMaterial sem map (blips, poças de lava,
+    // projéteis) — para não estragar elementos que já são "2D" ou decorativos.
+
+    _toggleWireframe() {
+        this._wireframeActive = !this._wireframeActive;
+        this.scene.traverse(obj => {
+            if (!(obj instanceof THREE.Mesh)) return;
+            const mat = obj.material;
+            // Só alterna materiais Lambert e Phong — são os sólidos com geometria 3D real
+            if (mat instanceof THREE.MeshLambertMaterial ||
+                mat instanceof THREE.MeshPhongMaterial   ||
+                mat instanceof THREE.MeshStandardMaterial) {
+                mat.wireframe = this._wireframeActive;
+            }
+        });
     }
 
     _showGameOver() {
@@ -539,13 +663,15 @@ export class SceneManager {
         if (!this._gameActive || this._gameOver || this._paused) return;
 
         const delta = this.clock.getDelta();
+        this._lastDelta = delta;   // guardado para uso em _checkCollisions (dano progressivo)
 
-        // Toggles de luz (teclas 1–4) — lidos e repostos a false no mesmo frame
+        // Toggles de luz (teclas 1–4) e wireframe (tecla 5)
         const t = this.inputHandler.toggles;
-        if (t.light1) { this.lighting.toggleAmbient();                                  t.light1 = false; }
-        if (t.light2) { this.lighting.toggleMoon();                                     t.light2 = false; }
-        if (t.light3) { this.player.tankLight.visible = !this.player.tankLight.visible; t.light3 = false; }
-        if (t.light4) { this.lighting.toggleVolcano();                                  t.light4 = false; }
+        if (t.light1)    { this.lighting.toggleAmbient();                                  t.light1    = false; }
+        if (t.light2)    { this.lighting.toggleMoon();                                     t.light2    = false; }
+        if (t.light3)    { this.player.tankLight.visible = !this.player.tankLight.visible; t.light3    = false; }
+        if (t.light4)    { this.lighting.toggleVolcano();                                  t.light4    = false; }
+        if (t.wireframe) { this._toggleWireframe();                                        t.wireframe = false; }
 
         // Câmara ortográfica do radar segue o jogador
         const p = this.player.tank.position;
@@ -567,7 +693,7 @@ export class SceneManager {
 
         for (const enemy of this.enemies) {
             const wasAlerted = enemy.isAlerted();
-            enemy.update(delta, this.player, this.environment.colliders);
+            enemy.update(delta, this.player, this.environment.colliders, this.environment.lavaPools);
             if (!wasAlerted && enemy.isAlerted()) {
                 this._handleEnemyAlert(enemy);
             }
@@ -585,7 +711,30 @@ export class SceneManager {
 
         for (const pickup of this.lifePickups) pickup.update(delta);
 
-        this.environment.update(delta);
+        this.environment.update(delta, this.levelManager.level);
+        if (this.environment.justBursted) this.audio.playEruptionLaunch();
+
+        // ── Torre de radar ────────────────────────────────────────────────────
+        // update() é sempre chamado — quando destroyed, corre apenas a animação de queda
+        this.radarTower.update(delta, this.player.tank.position);
+
+        if (this.radarTower.state === 'detected') {
+            this._onRadarDetection();
+            this.radarTower.enterCooldown();
+        }
+
+        // Countdown do alerta forçado nos inimigos (ALERTED_BY_RADAR)
+        if (this._radarAlertActive) {
+            this._radarAlertTimer -= delta;
+            if (this._radarAlertTimer <= 0) {
+                this._radarAlertActive = false;
+                // Limpa a flag de radar em todos os inimigos — voltam ao comportamento normal
+                for (const enemy of this.enemies) enemy._radarAlerted = false;
+            }
+        }
+
+        // HUD — barra de scan
+        this.hud.updateScan(this.radarTower.scanProgress);
 
         if (this.lives <= 0) {
             this._showGameOver();
@@ -600,5 +749,88 @@ export class SceneManager {
             this.levelManager.waveKilledEnemies,
             this.levelManager.waveTotalEnemies
         );
+    }
+
+    // ── Torre de radar — lógica de consequências ───────────────────────────────
+
+    /**
+     * Chamado quando a deteção é confirmada (scanProgress atingiu 1).
+     * Efeito A: alerta global forçado em todos os inimigos.
+     * Efeito B: spawn de reforços no bordo do mapa.
+     */
+    _onRadarDetection() {
+        const cfg   = CONFIG.RADAR_TOWER;
+        const count = this.radarTower._detectionCount; // antes de enterCooldown() incrementar
+
+        // Som de alerta de radar
+        this.audio.playRadarAlert();
+
+        // Efeito A — alerta global forçado (ALERTED_BY_RADAR)
+        this._radarAlertActive = true;
+        this._radarAlertTimer  = cfg.ALERT_DURATION;
+        for (const enemy of this.enemies) {
+            if (enemy.alive) enemy.forceAlert(this.player.tank.position);
+        }
+
+        // Efeito B — reforços escalados com o número de deteções
+        const n = cfg.REINFORCEMENT_BASE + count * cfg.REINFORCEMENT_STEP;
+        this._spawnRadarReinforcements(n);
+
+        // Feedback visual no HUD
+        this._showRadarAlert();
+    }
+
+    /**
+     * Spawna N inimigos no bordo do mapa, já em estado alertado.
+     * São adicionados ao contador da wave atual.
+     */
+    _spawnRadarReinforcements(n) {
+        const halfMap = CONFIG.GROUND_SIZE / 2 - 80;
+        const playerPos = this.player.tank.position;
+        this.levelManager.waveTotalEnemies += n;
+
+        for (let i = 0; i < n; i++) {
+            // Spawn a distância média do jogador (igual às waves normais),
+            // em ângulos distribuídos uniformemente para chegarem de direções diferentes
+            const angle = (i / n) * Math.PI * 2 + Math.random() * 0.8;
+            const dist  = THREE.MathUtils.randFloat(
+                CONFIG.LEVELS.WAVE_SPAWN_MIN_DISTANCE,
+                CONFIG.LEVELS.WAVE_SPAWN_MAX_DISTANCE
+            );
+            const pos = new THREE.Vector3(
+                THREE.MathUtils.clamp(playerPos.x + Math.cos(angle) * dist, -halfMap, halfMap),
+                0,
+                THREE.MathUtils.clamp(playerPos.z + Math.sin(angle) * dist, -halfMap, halfMap)
+            );
+
+            const difficulty = this.levelManager.getDifficulty();
+            const enemy = new Enemy(this.scene, pos, {
+                health:                  difficulty.health,
+                moveSpeedMultiplier:     difficulty.moveSpeedMultiplier,
+                fireCooldownMultiplier:  difficulty.fireCooldownMultiplier,
+                detectionRangeMultiplier: difficulty.detectionRangeMultiplier,
+                startsAlerted:           true,
+            });
+            this.enemies.push(enemy);
+        }
+    }
+
+    /**
+     * Mostra a mensagem de alerta da torre de radar no HUD (centrada no ecrã).
+     */
+    _showRadarAlert() {
+        if (!this._radarAlertEl) return;
+        this._radarAlertEl.innerHTML = `
+            <span>RADAR</span>
+            <small>DETEÇÃO CONFIRMADA — REFORÇOS A CAMINHO</small>
+        `;
+        this._radarAlertEl.classList.remove('active');
+        void this._radarAlertEl.offsetWidth; // força reflow para reiniciar animação
+        this._radarAlertEl.classList.add('active');
+
+        window.clearTimeout(this._radarAlertTimer_dom);
+        this._radarAlertTimer_dom = window.setTimeout(() => {
+            this._radarAlertEl.classList.remove('active');
+        }, 2800);
     }
 }

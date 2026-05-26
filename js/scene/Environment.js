@@ -5,13 +5,28 @@ const GREEN = 0x00ff00;
 
 export class Environment {
     constructor() {
-        this.group = new THREE.Group();
-        this.colliders = [];    // { x, z, radius } — usado para colisão com tanques
+        this.group    = new THREE.Group();
+        this.colliders = [];   // { x, z, radius } — usado para colisão com tanques
+
+        // Erupção — expostos publicamente para o SceneManager
+        this.lavaRocks          = [];   // pedras em voo  [{ mesh, velocity, impacted }]
+        this.lavaPools          = [];   // poças ativas   [{ mesh, ring, mat, ringMat, radius, life, maxLife }]
+        this.currentEruptionPhase = null;
+
+        this._eruptionTimer = 0;
+        this._pulseTime     = 0;
+        this._volcanoLight  = null;   // referência à PointLight (definida via setVolcanoLight)
+
         this._addStars();
         this._addMoon();
         this._addTrees();
         this._addRocks();
         this._addVolcano();
+    }
+
+    // Chamado pelo SceneManager após criar o Lighting, para o pulso da luz funcionar
+    setVolcanoLight(light) {
+        this._volcanoLight = light;
     }
 
     // ── Stars ─────────────────────────────────────────────────────────────────
@@ -52,12 +67,30 @@ export class Environment {
         moon.position.set(500, 600, -1100);
         this.group.add(moon);
 
-        // Halo suave em volta da lua
-        const halo = new THREE.Mesh(
-            new THREE.SphereGeometry(70, 20, 20),
-            new THREE.MeshBasicMaterial({ color: 0xbbbb88, transparent: true, opacity: 0.15, fog: false })
-        );
+        // Halo suave em volta da lua — Sprite com gradiente radial.
+        // Usar SphereGeometry criava um arco/meia-lua visível quando a câmara
+        // apontava na direção da lua mas não exatamente para ela (via o volume
+        // esférico translúcido). Um Sprite sempre vira para a câmara e evita
+        // completamente esse artefacto.
+        const haloCanvas = document.createElement('canvas');
+        haloCanvas.width = haloCanvas.height = 128;
+        const haloCtx = haloCanvas.getContext('2d');
+        const grad = haloCtx.createRadialGradient(64, 64, 10, 64, 64, 64);
+        grad.addColorStop(0.0, 'rgba(220, 210, 160, 0.22)');
+        grad.addColorStop(0.5, 'rgba(200, 190, 130, 0.08)');
+        grad.addColorStop(1.0, 'rgba(180, 170, 110, 0.0)');
+        haloCtx.fillStyle = grad;
+        haloCtx.fillRect(0, 0, 128, 128);
+
+        const haloTex = new THREE.CanvasTexture(haloCanvas);
+        const halo = new THREE.Sprite(new THREE.SpriteMaterial({
+            map:         haloTex,
+            transparent: true,
+            depthWrite:  false,
+            fog:         false,
+        }));
         halo.position.copy(moon.position);
+        halo.scale.setScalar(320);   // ~4× o diâmetro da lua
         this.group.add(halo);
     }
 
@@ -484,10 +517,141 @@ export class Environment {
         }
     }
 
+    // ── Erupção ───────────────────────────────────────────────────────────────
+
+    _getEruptionPhase(level) {
+        const { START_LEVEL, PHASES } = CONFIG.VOLCANO.ERUPTION;
+        if (level < START_LEVEL) return null;
+        const index = Math.min(Math.floor((level - START_LEVEL) / 3), PHASES.length - 1);
+        return PHASES[index];
+    }
+
+    _burst(phase) {
+        const { X, Z, HEIGHT } = CONFIG.VOLCANO;
+
+        for (let i = 0; i < phase.rocksPerBurst; i++) {
+            const angle  = Math.random() * Math.PI * 2;
+            const spread = 0.3 + Math.random() * 0.55;
+
+            const velocity = new THREE.Vector3(
+                Math.sin(angle) * spread,
+                1.0,
+                Math.cos(angle) * spread
+            ).normalize().multiplyScalar(phase.rockSpeed);
+
+            const geo = new THREE.DodecahedronGeometry(1.8 + Math.random() * 1.2, 0);
+            const mat = new THREE.MeshLambertMaterial({
+                color:             0xcc2200,
+                emissive:          new THREE.Color(0xff4400),
+                emissiveIntensity: 0.9,
+            });
+            const mesh = new THREE.Mesh(geo, mat);
+            mesh.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, 0);
+            mesh.position.set(X, HEIGHT, Z);
+            mesh.castShadow = true;
+
+            this.group.add(mesh);
+            this.lavaRocks.push({ mesh, velocity, impacted: false });
+        }
+    }
+
+    // Chamado pelo SceneManager após detetar o impacto, para criar a poça visual
+    spawnLavaPool(worldPosition, radius, duration) {
+        const geo = new THREE.CircleGeometry(radius, 24);
+        const mat = new THREE.MeshBasicMaterial({
+            color:      0xff3300,
+            transparent: true,
+            opacity:    0.75,
+            depthWrite: false,
+        });
+        const mesh = new THREE.Mesh(geo, mat);
+        mesh.rotation.x = -Math.PI / 2;
+        mesh.position.copy(worldPosition);
+        mesh.position.y = 0.05;   // ligeiramente acima para evitar z-fighting
+        this.group.add(mesh);
+
+        // Anel exterior mais subtil
+        const ringGeo = new THREE.RingGeometry(radius, radius * 1.25, 24);
+        const ringMat = new THREE.MeshBasicMaterial({
+            color: 0xff6600, transparent: true, opacity: 0.4,
+            side: THREE.DoubleSide, depthWrite: false,
+        });
+        const ring = new THREE.Mesh(ringGeo, ringMat);
+        ring.rotation.x = -Math.PI / 2;
+        ring.position.copy(mesh.position);
+        this.group.add(ring);
+
+        this.lavaPools.push({ mesh, ring, mat, ringMat, radius, life: 0, maxLife: duration });
+    }
+
+    _updateLavaRocks(delta) {
+        const { GRAVITY } = CONFIG.VOLCANO.ERUPTION;
+        for (const rock of this.lavaRocks) {
+            if (rock.impacted) continue;
+            rock.velocity.y -= GRAVITY * delta;
+            rock.mesh.position.addScaledVector(rock.velocity, delta);
+            rock.mesh.rotation.x += delta * 2.5;
+            rock.mesh.rotation.z += delta * 1.8;
+            if (rock.mesh.position.y <= 0) {
+                rock.mesh.position.y = 0;
+                rock.impacted = true;   // SceneManager lê este flag para aplicar dano
+            }
+        }
+
+        // Remove pedras já processadas pelo SceneManager (flag impacted + handled)
+        for (let i = this.lavaRocks.length - 1; i >= 0; i--) {
+            if (this.lavaRocks[i].handled) {
+                this.group.remove(this.lavaRocks[i].mesh);
+                this.lavaRocks.splice(i, 1);
+            }
+        }
+    }
+
+    _updateLavaPools(delta) {
+        for (let i = this.lavaPools.length - 1; i >= 0; i--) {
+            const pool = this.lavaPools[i];
+            pool.life += delta;
+            const t = pool.life / pool.maxLife;
+            pool.mat.opacity     = (1 - t) * 0.75;
+            pool.ringMat.opacity = (1 - t) * 0.4;
+            if (pool.life >= pool.maxLife) {
+                this.group.remove(pool.mesh);
+                this.group.remove(pool.ring);
+                this.lavaPools.splice(i, 1);
+            }
+        }
+    }
+
+    _updateEruption(delta, level) {
+        const phase = this._getEruptionPhase(level);
+        this.currentEruptionPhase = phase;
+        if (!phase) return;
+
+        this._eruptionTimer -= delta;
+        this.justBursted = false;   // reset; SceneManager lê e toca o som
+        if (this._eruptionTimer <= 0) {
+            this._burst(phase);
+            this._eruptionTimer = phase.burstInterval;
+            this.justBursted = true;
+        }
+
+        // Pulsa a PointLight da cratera no ritmo da erupção
+        if (this._volcanoLight) {
+            this._pulseTime += delta * 3.5;
+            const pulse = (Math.sin(this._pulseTime) + 1) / 2;
+            const base  = CONFIG.LIGHTS.VOLCANO_INTENSITY;
+            this._volcanoLight.intensity = base + pulse * phase.lightPulseIntensity;
+        }
+
+        this._updateLavaRocks(delta);
+        this._updateLavaPools(delta);
+    }
+
     // ─────────────────────────────────────────────────────────────────────────
 
-    update(delta) {
+    update(delta, level = 1) {
         this._updateVolcanoSmoke(delta);
+        this._updateEruption(delta, level);
     }
 
     addTo(scene) {

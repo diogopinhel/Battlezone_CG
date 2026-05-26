@@ -402,6 +402,64 @@ html, body {
     width: 280px;
 }
 
+/* ── Barra de scan da torre de radar ─────────────────────────────────────── */
+
+#hud-scan {
+    font-size: 15px;
+    letter-spacing: 2px;
+    color: #ff8800;
+    text-shadow: 0 0 8px #ff8800, 0 0 18px #ff4400;
+    margin-top: 6px;
+    animation: scan-pulse 0.35s infinite alternate;
+}
+
+@keyframes scan-pulse {
+    0%   { opacity: 1; }
+    100% { opacity: 0.55; }
+}
+
+/* ── Alerta global da torre de radar ─────────────────────────────────────── */
+
+#radar-alert {
+    position: fixed;
+    top: 38%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    color: #ff2200;
+    text-align: center;
+    text-shadow: 0 0 16px #ff2200, 0 0 40px #ff0000;
+    z-index: 30;
+    pointer-events: none;
+}
+
+#radar-alert.active {
+    display: flex;
+    animation: radar-alert-anim 2.8s ease-out forwards;
+}
+
+#radar-alert span {
+    font-size: 48px;
+    letter-spacing: 8px;
+}
+
+#radar-alert small {
+    font-size: 16px;
+    letter-spacing: 4px;
+    color: #ff8800;
+    text-shadow: 0 0 10px #ff8800;
+}
+
+@keyframes radar-alert-anim {
+    0%   { opacity: 0; transform: translate(-50%, -44%) scale(0.9); }
+    15%  { opacity: 1; transform: translate(-50%, -50%) scale(1);   }
+    75%  { opacity: 1; transform: translate(-50%, -50%) scale(1);   }
+    100% { opacity: 0; transform: translate(-50%, -56%) scale(1.05); }
+}
+
 /* ── Flash vermelho ao ser atingido ──────────────────────────────────────── */
 
 #hit-flash {

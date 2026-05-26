@@ -13,10 +13,11 @@ export class InputHandler {
         // O SceneManager lê e repõe a false no mesmo frame, garantindo que o
         // toggle acontece uma única vez por pressão (não fica ativo enquanto held).
         this.toggles = {
-            light1: false,  // tecla 1 → AmbientLight
-            light2: false,  // tecla 2 → DirectionalLight (lua)
-            light3: false,  // tecla 3 → PointLight tanque
-            light4: false,  // tecla 4 → PointLight vulcão
+            light1:    false,  // tecla 1 → AmbientLight
+            light2:    false,  // tecla 2 → DirectionalLight (lua)
+            light3:    false,  // tecla 3 → PointLight tanque
+            light4:    false,  // tecla 4 → PointLight vulcão
+            wireframe: false,  // tecla 5 → modo wireframe global
         };
 
         this._onKeyDown = this._onKeyDown.bind(this);
@@ -37,7 +38,8 @@ export class InputHandler {
             case 'Digit1':    this.toggles.light1 = true; break;
             case 'Digit2':    this.toggles.light2 = true; break;
             case 'Digit3':    this.toggles.light3 = true; break;
-            case 'Digit4':    this.toggles.light4 = true; break;
+            case 'Digit4':    this.toggles.light4    = true; break;
+            case 'Digit5':    this.toggles.wireframe = true; break;
         }
     }
 
