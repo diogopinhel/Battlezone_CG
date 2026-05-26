@@ -157,6 +157,13 @@ export const CONFIG = {
         LEVEL_MESSAGE_TIME: 2.2,         // segundos que a mensagem de nivel fica visivel
     },
 
+    // Pickups de vida no mapa
+    LIFE_PICKUP: {
+        INITIAL:        2,   // vidas no início do jogo
+        SPAWN_PER_LEVEL: 2,  // tentativa de spawn por nível
+        MAX_ON_MAP:      4,  // cap máximo em simultâneo no mapa
+    },
+
     // Radar / minimapa
     RADAR: {
         RANGE: 1000,  // mostra o mapa completo (ground = 2000×2000, half = 1000)
@@ -171,12 +178,12 @@ export const CONFIG = {
         X: -160,                    // mais perto do centro (≈ 205 u da origem)
         Z:  130,
         HEALTH: 3,                  // tiros para destruir
-        DISH_ROTATION_SPEED: 0.22,  // rad/s — rotação lenta (~28 s por volta completa)
+        DISH_ROTATION_SPEED: 0.18,  // rad/s — rotação lenta (~35 s por volta completa)
         DISH_SCAN_SPEED_MULT: 1.6,  // acelera ligeiramente ao detetar
         DISH_COOLDOWN_SPEED_MULT: 0.25,
         BEAM_HALF_ANGLE: 0.30,      // metade do ângulo do cone (≈17°) — mais largo e visível
         BEAM_RANGE: 220,            // alcance reduzido → cone visualmente razoável
-        SCAN_TIME: 1.0,             // segundos para confirmar deteção
+        SCAN_TIME: 2.0,             // segundos para confirmar deteção
         ALERT_DURATION: 60,         // segundos de alerta forçado nos inimigos
         COOLDOWN: 180,              // segundos de cooldown após deteção
         REINFORCEMENT_BASE: 2,      // inimigos extra na 1.ª deteção

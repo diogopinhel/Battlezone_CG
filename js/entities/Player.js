@@ -108,6 +108,16 @@ export class Player {
             canvas.requestPointerLock();
         });
 
+        // O browser liberta o pointer lock ao entrar em fullscreen —
+        // re-pedimos automaticamente, mas só se o jogo já estiver ativo
+        // (menu inicial escondido), para não sumir o cursor nos menus.
+        document.addEventListener('fullscreenchange', () => {
+            const menu = document.getElementById('start-menu');
+            if (document.fullscreenElement && menu && menu.style.display === 'none') {
+                canvas.requestPointerLock();
+            }
+        });
+
         document.addEventListener('mousemove', (e) => {
             if (document.pointerLockElement !== canvas) return;
             // movementX > 0 = rato para a direita → torreta vira à direita (−Y em Three.js)

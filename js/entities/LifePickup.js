@@ -46,6 +46,27 @@ export class LifePickup {
         const sprite = new THREE.Sprite(mat);
         sprite.scale.setScalar(5.5);
         this._group.add(sprite);
+
+        // Blip do radar (layer 1) — coração verde grande, visível apenas na câmara do radar.
+        const radarCanvas = document.createElement('canvas');
+        radarCanvas.width = radarCanvas.height = 64;
+        const rctx = radarCanvas.getContext('2d');
+        rctx.fillStyle = '#00ff00';
+        rctx.font = 'bold 52px serif';
+        rctx.textAlign = 'center';
+        rctx.textBaseline = 'middle';
+        rctx.fillText('♥', 32, 35);
+
+        const radarMat = new THREE.SpriteMaterial({
+            map: new THREE.CanvasTexture(radarCanvas),
+            transparent: true,
+            depthTest: false,
+        });
+        const radarBlip = new THREE.Sprite(radarMat);
+        radarBlip.scale.setScalar(50);
+        radarBlip.position.y = 1;
+        radarBlip.layers.set(1);
+        this._group.add(radarBlip);
     }
 
     // ── Luz de presença ───────────────────────────────────────────────────────

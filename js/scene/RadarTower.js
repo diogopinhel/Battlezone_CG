@@ -168,6 +168,16 @@ export class RadarTower {
         this._topLight = new THREE.PointLight(GREEN, 1.5, 40);
         this._topLight.position.y = 35;
         this.group.add(this._topLight);
+
+        // Blip do radar (layer 1) — círculo vermelho como os inimigos, visível só no radar.
+        const blip = new THREE.Mesh(
+            new THREE.CircleGeometry(16, 16),
+            new THREE.MeshBasicMaterial({ color: 0xff2222 })
+        );
+        blip.rotation.x = -Math.PI / 2;
+        blip.position.y = 1;
+        blip.layers.set(1);
+        this.group.add(blip);
     }
 
     // ── Barra de vida ─────────────────────────────────────────────────────────

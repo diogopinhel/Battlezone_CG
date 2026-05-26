@@ -90,15 +90,27 @@ export class SceneManager {
         this._radarAlertEl   = document.getElementById('radar-alert');
 
         // Estado de game over, pausa e início
-        this._gameActive = false;
-        this._gameOver   = false;
-        this._paused     = false;
-        this._pauseEl    = document.getElementById('pause-menu');
+        this._gameActive        = false;
+        this._gameOver          = false;
+        this._paused            = false;
+        this._pauseEl           = document.getElementById('pause-menu');
+        this._intentionalFSExit = false;   // distingue saída intencional (F) de involuntária (ESC)
 
         document.getElementById('btn-resume').addEventListener('click', () => this.resume());
         document.getElementById('btn-pause-quit').addEventListener('click', () => location.reload());
         document.addEventListener('keydown', e => {
             if (e.code === 'Escape') this._togglePause();
+        });
+
+        // Quando o ESC sai do fullscreen involuntariamente, abre a pausa.
+        // A saída intencional (tecla F) marca _intentionalFSExit antes de chamar exitFullscreen().
+        document.addEventListener('fullscreenchange', () => {
+            if (!document.fullscreenElement && !this._intentionalFSExit) {
+                if (this._gameActive && !this._gameOver && !this._paused) {
+                    this.pause();
+                }
+            }
+            this._intentionalFSExit = false;
         });
 
         // Clock para calcular delta time correto por frame
@@ -307,6 +319,7 @@ export class SceneManager {
     _advanceLevel() {
         this.levelManager.advanceLevel();
         this._spawnEnemyWave();
+        this._spawnLifePickups(CONFIG.LIFE_PICKUP.SPAWN_PER_LEVEL);
         this._showLevelMessage();
     }
 
@@ -327,10 +340,10 @@ export class SceneManager {
         }, CONFIG.LEVELS.LEVEL_MESSAGE_TIME * 1000);
     }
 
-    _spawnLifePickups() {
-        const count = 2;
-        for (let i = 0; i < count; i++) {
-            const angle = (i / count) * Math.PI * 2 + Math.random() * Math.PI;
+    _spawnLifePickups(count = CONFIG.LIFE_PICKUP.INITIAL) {
+        const canSpawn = Math.min(count, CONFIG.LIFE_PICKUP.MAX_ON_MAP - this.lifePickups.length);
+        for (let i = 0; i < canSpawn; i++) {
+            const angle = (i / canSpawn) * Math.PI * 2 + Math.random() * Math.PI;
             const dist  = 90 + Math.random() * 140;
             const pos   = new THREE.Vector3(
                 Math.cos(angle) * dist,
@@ -619,6 +632,15 @@ export class SceneManager {
     beginGame() {
         this._gameActive = true;
         this.clock.getDelta(); // descarta o delta acumulado durante o menu
+    }
+
+    toggleFullscreen() {
+        if (!document.fullscreenElement) {
+            document.documentElement.requestFullscreen();
+        } else {
+            this._intentionalFSExit = true;
+            document.exitFullscreen();
+        }
     }
 
     _togglePause() {

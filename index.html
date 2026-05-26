@@ -45,7 +45,7 @@
             <h2 class="overlay-title">PAUSA</h2>
             <nav id="pause-nav">
                 <button class="menu-btn" id="btn-resume">CONTINUAR</button>
-                <button class="menu-btn" id="btn-pause-quit">SAIR PARA MENU</button>
+                <button class="menu-btn" id="btn-pause-quit">SAIR PARA MENU</button>    
             </nav>
         </div>
     </div>
@@ -105,21 +105,13 @@
 
     <script type="module" src="js/main.js"></script>
     <script>
-        function toggleFullscreen() {
-            if (!document.fullscreenElement) {
-                document.documentElement.requestFullscreen();
-            } else {
-                document.exitFullscreen();
-            }
-        }
-
-        document.getElementById('btn-fullscreen').addEventListener('click', toggleFullscreen);
+        document.getElementById('go-restart').addEventListener('click', () => location.reload());
 
         document.addEventListener('keydown', e => {
-            if (e.code === 'KeyF') toggleFullscreen();
+            if (e.code === 'Enter' && document.getElementById('game-over').style.display === 'flex') {
+                location.reload();
+            }
         });
-
-        document.getElementById('go-restart').addEventListener('click', () => location.reload());
     </script>
 </body>
 </html>

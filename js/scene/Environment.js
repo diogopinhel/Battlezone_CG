@@ -157,6 +157,32 @@ export class Environment {
         return texture;
     }
 
+    _makeRadarBlipSprite(emoji, blipScale, tint = null) {
+        const canvas = document.createElement('canvas');
+        canvas.width = canvas.height = 64;
+        const ctx = canvas.getContext('2d');
+        ctx.font = '48px serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(emoji, 32, 34);
+        if (tint) {
+            ctx.globalCompositeOperation = 'source-in';
+            ctx.fillStyle = tint;
+            ctx.fillRect(0, 0, 64, 64);
+            ctx.globalCompositeOperation = 'source-over';
+        }
+
+        const sprite = new THREE.Sprite(new THREE.SpriteMaterial({
+            map: new THREE.CanvasTexture(canvas),
+            transparent: true,
+            depthTest: false,
+        }));
+        sprite.scale.setScalar(blipScale);
+        sprite.position.y = 1;
+        sprite.layers.set(1);
+        return sprite;
+    }
+
     _makeTree(scale) {
         const group = new THREE.Group();
 
@@ -204,6 +230,7 @@ export class Environment {
             group.add(coneWire);
         }
 
+        group.add(this._makeRadarBlipSprite('🌲', 32, '#00ff00'));
         group.scale.setScalar(scale);
         return group;
     }

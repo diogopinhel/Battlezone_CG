@@ -28,4 +28,9 @@ if (!canvas) {
     document.getElementById('btn-quit').addEventListener('click', () => {
         window.close();
     });
+
+    document.getElementById('btn-fullscreen').addEventListener('click', () => sceneManager.toggleFullscreen());
+    document.addEventListener('keydown', e => {
+        if (e.code === 'KeyF') sceneManager.toggleFullscreen();
+    });
 }
