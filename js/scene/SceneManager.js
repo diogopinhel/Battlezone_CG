@@ -11,6 +11,7 @@ import { Wreck } from '../entities/Wreck.js';
 import { LifePickup } from '../entities/LifePickup.js';
 import { HUD } from '../ui/HUD.js';
 import { AudioManager } from '../audio/AudioManager.js';
+import { RadarTower } from './RadarTower.js';
 
 /**
  * Classe central que gere a cena three.js.
@@ -69,12 +70,24 @@ export class SceneManager {
         this._spawnEnemyWave();
         this._spawnLifePickups();
 
+        // Torre de radar inimiga
+        this.radarTower = new RadarTower();
+        this.radarTower.addTo(this.scene);
+        // Adiciona o colider da torre à lista de obstáculos estáticos do environment
+        // (para colisão física dos tanques e projéteis inimigos)
+        this.environment.colliders.push(this.radarTower.collider);
+
+        // Estado do alerta do radar (gestão do timer do ALERTED_BY_RADAR)
+        this._radarAlertActive = false;
+        this._radarAlertTimer  = 0;
+
         // HUD
         this.hud = new HUD();
 
         // Flash ao ser atingido
         this._hitFlashEl = document.getElementById('hit-flash');
         this._levelMessageEl = document.getElementById('level-message');
+        this._radarAlertEl   = document.getElementById('radar-alert');
 
         // Estado de game over, pausa e início
         this._gameActive = false;
@@ -437,6 +450,29 @@ export class SceneManager {
             }
         }
 
+        // ── Projéteis do jogador contra a torre de radar ──────────────────────
+        // (verificado antes do loop de obstáculos estáticos para poder aplicar
+        //  takeDamage; o projétil é removido aqui e não voltará a ser processado)
+        if (this.radarTower.state !== 'destroyed') {
+            const col = this.radarTower.collider;
+            for (let i = this.player.projectiles.length - 1; i >= 0; i--) {
+                const proj = this.player.projectiles[i];
+                const dx = proj.position.x - col.x;
+                const dz = proj.position.z - col.z;
+                if (dx * dx + dz * dz < col.radius * col.radius) {
+                    this.radarTower.takeDamage(1);
+                    this.audio.playHit();
+                    this.scene.remove(proj);
+                    this.player.projectiles.splice(i, 1);
+
+                    if (this.radarTower.state === 'destroyed') {
+                        this.score += CONFIG.RADAR_TOWER.DESTROY_SCORE;
+                        this.audio.playDestroy();
+                    }
+                }
+            }
+        }
+
         // Projeteis contra obstaculos estaticos (pedras e arvores)
         const colliders = this.environment.colliders;
 
@@ -678,6 +714,28 @@ export class SceneManager {
         this.environment.update(delta, this.levelManager.level);
         if (this.environment.justBursted) this.audio.playEruptionLaunch();
 
+        // ── Torre de radar ────────────────────────────────────────────────────
+        // update() é sempre chamado — quando destroyed, corre apenas a animação de queda
+        this.radarTower.update(delta, this.player.tank.position);
+
+        if (this.radarTower.state === 'detected') {
+            this._onRadarDetection();
+            this.radarTower.enterCooldown();
+        }
+
+        // Countdown do alerta forçado nos inimigos (ALERTED_BY_RADAR)
+        if (this._radarAlertActive) {
+            this._radarAlertTimer -= delta;
+            if (this._radarAlertTimer <= 0) {
+                this._radarAlertActive = false;
+                // Limpa a flag de radar em todos os inimigos — voltam ao comportamento normal
+                for (const enemy of this.enemies) enemy._radarAlerted = false;
+            }
+        }
+
+        // HUD — barra de scan
+        this.hud.updateScan(this.radarTower.scanProgress);
+
         if (this.lives <= 0) {
             this._showGameOver();
             return;
@@ -691,5 +749,88 @@ export class SceneManager {
             this.levelManager.waveKilledEnemies,
             this.levelManager.waveTotalEnemies
         );
+    }
+
+    // ── Torre de radar — lógica de consequências ───────────────────────────────
+
+    /**
+     * Chamado quando a deteção é confirmada (scanProgress atingiu 1).
+     * Efeito A: alerta global forçado em todos os inimigos.
+     * Efeito B: spawn de reforços no bordo do mapa.
+     */
+    _onRadarDetection() {
+        const cfg   = CONFIG.RADAR_TOWER;
+        const count = this.radarTower._detectionCount; // antes de enterCooldown() incrementar
+
+        // Som de alerta de radar
+        this.audio.playRadarAlert();
+
+        // Efeito A — alerta global forçado (ALERTED_BY_RADAR)
+        this._radarAlertActive = true;
+        this._radarAlertTimer  = cfg.ALERT_DURATION;
+        for (const enemy of this.enemies) {
+            if (enemy.alive) enemy.forceAlert(this.player.tank.position);
+        }
+
+        // Efeito B — reforços escalados com o número de deteções
+        const n = cfg.REINFORCEMENT_BASE + count * cfg.REINFORCEMENT_STEP;
+        this._spawnRadarReinforcements(n);
+
+        // Feedback visual no HUD
+        this._showRadarAlert();
+    }
+
+    /**
+     * Spawna N inimigos no bordo do mapa, já em estado alertado.
+     * São adicionados ao contador da wave atual.
+     */
+    _spawnRadarReinforcements(n) {
+        const halfMap = CONFIG.GROUND_SIZE / 2 - 80;
+        const playerPos = this.player.tank.position;
+        this.levelManager.waveTotalEnemies += n;
+
+        for (let i = 0; i < n; i++) {
+            // Spawn a distância média do jogador (igual às waves normais),
+            // em ângulos distribuídos uniformemente para chegarem de direções diferentes
+            const angle = (i / n) * Math.PI * 2 + Math.random() * 0.8;
+            const dist  = THREE.MathUtils.randFloat(
+                CONFIG.LEVELS.WAVE_SPAWN_MIN_DISTANCE,
+                CONFIG.LEVELS.WAVE_SPAWN_MAX_DISTANCE
+            );
+            const pos = new THREE.Vector3(
+                THREE.MathUtils.clamp(playerPos.x + Math.cos(angle) * dist, -halfMap, halfMap),
+                0,
+                THREE.MathUtils.clamp(playerPos.z + Math.sin(angle) * dist, -halfMap, halfMap)
+            );
+
+            const difficulty = this.levelManager.getDifficulty();
+            const enemy = new Enemy(this.scene, pos, {
+                health:                  difficulty.health,
+                moveSpeedMultiplier:     difficulty.moveSpeedMultiplier,
+                fireCooldownMultiplier:  difficulty.fireCooldownMultiplier,
+                detectionRangeMultiplier: difficulty.detectionRangeMultiplier,
+                startsAlerted:           true,
+            });
+            this.enemies.push(enemy);
+        }
+    }
+
+    /**
+     * Mostra a mensagem de alerta da torre de radar no HUD (centrada no ecrã).
+     */
+    _showRadarAlert() {
+        if (!this._radarAlertEl) return;
+        this._radarAlertEl.innerHTML = `
+            <span>RADAR</span>
+            <small>DETEÇÃO CONFIRMADA — REFORÇOS A CAMINHO</small>
+        `;
+        this._radarAlertEl.classList.remove('active');
+        void this._radarAlertEl.offsetWidth; // força reflow para reiniciar animação
+        this._radarAlertEl.classList.add('active');
+
+        window.clearTimeout(this._radarAlertTimer_dom);
+        this._radarAlertTimer_dom = window.setTimeout(() => {
+            this._radarAlertEl.classList.remove('active');
+        }, 2800);
     }
 }

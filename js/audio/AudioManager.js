@@ -175,6 +175,56 @@ export class AudioManager {
         noise.start(now);
     }
 
+    // Alerta da torre de radar: sonar ping + klaxon militar
+    //
+    // Fase 1 (0.00–0.55 s): sine 1050 Hz com eco — o "ping" clássico de sonar/radar
+    // Fase 2 (0.65–1.85 s): 3× klaxon sawtooth 660→440 Hz — sirene de deteção confirmada
+    //
+    // A onda sawtooth é o que dá o carácter "BWAH" de klaxon militar,
+    // diferente dos beeps de onda quadrada que soam mais a computador.
+    playRadarAlert() {
+        const ctx = this._getCtx();
+        const now = ctx.currentTime;
+
+        // ── Sonar ping (tom puro, decaimento lento) ───────────────────────────
+        const pingOsc  = ctx.createOscillator();
+        const pingGain = ctx.createGain();
+        pingOsc.connect(pingGain);
+        pingGain.connect(ctx.destination);
+
+        pingOsc.type = 'sine';
+        pingOsc.frequency.setValueAtTime(1050, now);
+
+        pingGain.gain.setValueAtTime(0.50, now);
+        pingGain.gain.exponentialRampToValueAtTime(0.001, now + 0.55);
+
+        pingOsc.start(now);
+        pingOsc.stop(now + 0.55);
+
+        // ── Klaxon militar (3× "BWAH") ────────────────────────────────────────
+        // Sawtooth: rico em harmónicos, dá a qualidade de sirene/buzina
+        // Frequência desce de 660→440 Hz — é este sweep descendente que cria o "BWAH"
+        for (let i = 0; i < 3; i++) {
+            const t0   = now + 0.65 + i * 0.40;
+            const osc  = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+
+            osc.type = 'sawtooth';
+            osc.frequency.setValueAtTime(660, t0);
+            osc.frequency.exponentialRampToValueAtTime(440, t0 + 0.30);
+
+            gain.gain.setValueAtTime(0, t0);
+            gain.gain.linearRampToValueAtTime(0.22, t0 + 0.02);
+            gain.gain.setValueAtTime(0.22, t0 + 0.26);
+            gain.gain.linearRampToValueAtTime(0, t0 + 0.36);
+
+            osc.start(t0);
+            osc.stop(t0 + 0.40);
+        }
+    }
+
     // Explosão seca ao impactar no chão
     playEruptionImpact() {
         const ctx      = this._getCtx();

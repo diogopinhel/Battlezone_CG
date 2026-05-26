@@ -23,7 +23,8 @@ export class Enemy {
         this.projectiles = [];
         this._fireCooldown = this._getFireCooldown();
         this._patrolTarget = this._createPatrolTarget();
-        this._alerted = options.startsAlerted ?? false;
+        this._alerted      = options.startsAlerted ?? false;
+        this._radarAlerted = false;   // alerta forçado pela torre de radar (não expira por distância)
         this._lastKnownPlayerPosition = null;
         this._bodyMat = null;
 
@@ -58,6 +59,19 @@ export class Enemy {
         this._alerted = true;
         if (playerPosition) {
             this._lastKnownPlayerPosition = playerPosition.clone();
+        }
+    }
+
+    /**
+     * Alerta forçado pela torre de radar — diferente do alerta normal porque:
+     *  • ignora a distância de deteção (vem atrás do jogador independentemente)
+     *  • não expira por distância, só por tempo (gerido pelo SceneManager)
+     */
+    forceAlert(targetPosition) {
+        this._alerted      = true;
+        this._radarAlerted = true;
+        if (targetPosition) {
+            this._lastKnownPlayerPosition = targetPosition.clone();
         }
     }
 

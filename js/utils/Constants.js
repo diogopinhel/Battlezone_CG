@@ -161,4 +161,27 @@ export const CONFIG = {
     RADAR: {
         RANGE: 1000,  // mostra o mapa completo (ground = 2000×2000, half = 1000)
     },
+
+    // Torre de radar inimiga — instalação de vigilância fixa no mapa
+    //
+    // Restrição obrigatória para o scan ser possível num alvo parado:
+    //   (BEAM_HALF_ANGLE × 2) / DISH_ROTATION_SPEED  ≥  SCAN_TIME
+    //   (0.30 × 2) / 0.22 = 2.7 s  ≥  1.0 s  ✓
+    RADAR_TOWER: {
+        X: -160,                    // mais perto do centro (≈ 205 u da origem)
+        Z:  130,
+        HEALTH: 3,                  // tiros para destruir
+        DISH_ROTATION_SPEED: 0.22,  // rad/s — rotação lenta (~28 s por volta completa)
+        DISH_SCAN_SPEED_MULT: 1.6,  // acelera ligeiramente ao detetar
+        DISH_COOLDOWN_SPEED_MULT: 0.25,
+        BEAM_HALF_ANGLE: 0.30,      // metade do ângulo do cone (≈17°) — mais largo e visível
+        BEAM_RANGE: 220,            // alcance reduzido → cone visualmente razoável
+        SCAN_TIME: 1.0,             // segundos para confirmar deteção
+        ALERT_DURATION: 60,         // segundos de alerta forçado nos inimigos
+        COOLDOWN: 180,              // segundos de cooldown após deteção
+        REINFORCEMENT_BASE: 2,      // inimigos extra na 1.ª deteção
+        REINFORCEMENT_STEP: 1,      // inimigos extra adicionais por deteção seguinte
+        DESTROY_SCORE: 50,          // pontos bónus ao destruir a torre
+        BODY_RADIUS: 8,             // raio de colisão física da torre
+    },
 };
