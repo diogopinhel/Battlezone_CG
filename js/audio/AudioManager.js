@@ -1,6 +1,108 @@
+import { CONFIG } from '../utils/Constants.js';
+
 export class AudioManager {
     constructor() {
-        this._ctx = null;
+        this._ctx             = null;
+        this._launchBuffer    = null;
+        this._impactBuffer    = null;
+        this._scanBuffer      = null;
+        this._themeBuffer     = null;
+        this._scanSource      = null;
+        this._scanGain        = null;
+        this._themeSource     = null;
+        this._fxBus           = null;
+        this._musicBus        = null;
+        this._musicVolume     = 0.7;
+        this._fxVolume        = 0.7;
+        this._eruptionLoading = false;
+    }
+
+    // ── Buses de volume master ────────────────────────────────────────────────
+
+    _getFxBus() {
+        if (!this._fxBus) {
+            const ctx = this._getCtx();
+            this._fxBus = ctx.createGain();
+            this._fxBus.gain.value = this._fxVolume;
+            this._fxBus.connect(ctx.destination);
+        }
+        return this._fxBus;
+    }
+
+    _getMusicBus() {
+        if (!this._musicBus) {
+            const ctx = this._getCtx();
+            this._musicBus = ctx.createGain();
+            this._musicBus.gain.value = this._musicVolume;
+            this._musicBus.connect(ctx.destination);
+        }
+        return this._musicBus;
+    }
+
+    setMusicVolume(v) {
+        this._musicVolume = v;
+        if (this._musicBus) this._musicBus.gain.value = v;
+    }
+
+    setFxVolume(v) {
+        this._fxVolume = v;
+        if (this._fxBus) this._fxBus.gain.value = v;
+    }
+
+    // ── Carregamento de buffers ───────────────────────────────────────────────
+
+    async _loadEruptionBuffers() {
+        if (this._eruptionLoading || this._launchBuffer) return;
+        this._eruptionLoading = true;
+        const ctx = this._getCtx();
+        const cfg = CONFIG.ERUPTION_SOUNDS;
+        try {
+            if (cfg.LAUNCH_FILE === cfg.IMPACT_FILE) {
+                const res = await fetch(cfg.LAUNCH_FILE);
+                const buf = await ctx.decodeAudioData(await res.arrayBuffer());
+                this._launchBuffer = buf;
+                this._impactBuffer = buf;
+            } else {
+                const [lr, ir] = await Promise.all([fetch(cfg.LAUNCH_FILE), fetch(cfg.IMPACT_FILE)]);
+                const [la, ia] = await Promise.all([lr.arrayBuffer(), ir.arrayBuffer()]);
+                [this._launchBuffer, this._impactBuffer] = await Promise.all([
+                    ctx.decodeAudioData(la),
+                    ctx.decodeAudioData(ia),
+                ]);
+            }
+        } catch (e) {}
+    }
+
+    async _loadScanBuffer() {
+        if (this._scanBuffer) return;
+        const ctx = this._getCtx();
+        try {
+            const res = await fetch(CONFIG.RADAR_SCAN_SOUND.FILE);
+            const arr = await res.arrayBuffer();
+            this._scanBuffer = await ctx.decodeAudioData(arr);
+        } catch (e) {}
+    }
+
+    async _loadThemeBuffer() {
+        if (this._themeBuffer) return;
+        const ctx = this._getCtx();
+        try {
+            const res = await fetch('./audio/main_theme.mp3');
+            const arr = await res.arrayBuffer();
+            this._themeBuffer = await ctx.decodeAudioData(arr);
+        } catch (e) {}
+    }
+
+    _playBuffer(buffer, volume, offset, duration) {
+        if (!buffer) return;
+        const ctx    = this._getCtx();
+        const source = ctx.createBufferSource();
+        source.buffer = buffer;
+        const gain = ctx.createGain();
+        gain.gain.setValueAtTime(volume, ctx.currentTime);
+        source.connect(gain);
+        gain.connect(this._getFxBus());
+        source.start(ctx.currentTime, offset, duration ?? undefined);
     }
 
     // ── Contexto ──────────────────────────────────────────────────────────────
@@ -15,69 +117,87 @@ export class AudioManager {
         return this._ctx;
     }
 
-    // ── Sons ──────────────────────────────────────────────────────────────────
+    // ── Música de fundo ───────────────────────────────────────────────────────
+
+    playMusic() {
+        if (this._themeSource) return;
+        this._loadThemeBuffer().then(() => {
+            if (!this._themeBuffer || this._themeSource) return;
+            const ctx    = this._getCtx();
+            const source = ctx.createBufferSource();
+            source.buffer = this._themeBuffer;
+            source.loop   = true;
+            source.connect(this._getMusicBus());
+            source.start();
+            this._themeSource = source;
+            source.onended = () => { this._themeSource = null; };
+        });
+    }
+
+    stopMusic() {
+        if (!this._themeSource) return;
+        try { this._themeSource.stop(); } catch (e) {}
+        this._themeSource = null;
+    }
+
+    pauseAudio() {
+        this._ctx?.suspend();
+    }
+
+    resumeAudio() {
+        this._ctx?.resume();
+    }
+
+    // ── Sons de efeitos ───────────────────────────────────────────────────────
 
     playShoot() {
         const ctx = this._getCtx();
         const now = ctx.currentTime;
-
         const osc  = ctx.createOscillator();
         const gain = ctx.createGain();
-
         osc.connect(gain);
-        gain.connect(ctx.destination);
-
+        gain.connect(this._getFxBus());
         osc.type = 'square';
         osc.frequency.setValueAtTime(900, now);
         osc.frequency.exponentialRampToValueAtTime(80, now + 0.18);
-
         gain.gain.setValueAtTime(0.28, now);
         gain.gain.exponentialRampToValueAtTime(0.001, now + 0.18);
-
         osc.start(now);
         osc.stop(now + 0.18);
     }
 
-    // Som de acertar num inimigo (sem o destruir)
     playHit() {
         const ctx = this._getCtx();
         const now = ctx.currentTime;
-
         const bufSize = Math.floor(ctx.sampleRate * 0.07);
         const buffer  = ctx.createBuffer(1, bufSize, ctx.sampleRate);
         const data    = buffer.getChannelData(0);
         for (let i = 0; i < bufSize; i++) {
             data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (bufSize * 0.25));
         }
-
-        const source   = ctx.createBufferSource();
-        source.buffer  = buffer;
-
-        const filter   = ctx.createBiquadFilter();
-        filter.type    = 'bandpass';
+        const source = ctx.createBufferSource();
+        source.buffer = buffer;
+        const filter = ctx.createBiquadFilter();
+        filter.type  = 'bandpass';
         filter.frequency.value = 900;
         filter.Q.value = 3;
-
         const gain = ctx.createGain();
         gain.gain.setValueAtTime(0.45, now);
-
         source.connect(filter);
         filter.connect(gain);
-        gain.connect(ctx.destination);
+        gain.connect(this._getFxBus());
         source.start(now);
     }
 
-    // Arpejo ascendente ao apanhar uma vida (C5 → E5 → G5)
     playPickup() {
         const ctx = this._getCtx();
         const now = ctx.currentTime;
-
         [523, 659, 784].forEach((freq, i) => {
             const t    = now + i * 0.09;
             const osc  = ctx.createOscillator();
             const gain = ctx.createGain();
             osc.connect(gain);
-            gain.connect(ctx.destination);
+            gain.connect(this._getFxBus());
             osc.type = 'square';
             osc.frequency.setValueAtTime(freq, t);
             gain.gain.setValueAtTime(0.14, t);
@@ -87,184 +207,117 @@ export class AudioManager {
         });
     }
 
-    // Som de destruicao de inimigo: explosao com grave e ruido
     playDestroy() {
         const ctx      = this._getCtx();
         const now      = ctx.currentTime;
         const duration = 0.65;
-
-        // Ruido de explosao
-        const bufSize = Math.floor(ctx.sampleRate * duration);
-        const buffer  = ctx.createBuffer(1, bufSize, ctx.sampleRate);
-        const data    = buffer.getChannelData(0);
+        const bufSize  = Math.floor(ctx.sampleRate * duration);
+        const buffer   = ctx.createBuffer(1, bufSize, ctx.sampleRate);
+        const data     = buffer.getChannelData(0);
         for (let i = 0; i < bufSize; i++) {
             data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (bufSize * 0.12));
         }
-
-        const source  = ctx.createBufferSource();
-        source.buffer = buffer;
-
-        const lp = ctx.createBiquadFilter();
-        lp.type  = 'lowpass';
+        const source    = ctx.createBufferSource();
+        source.buffer   = buffer;
+        const lp        = ctx.createBiquadFilter();
+        lp.type         = 'lowpass';
         lp.frequency.value = 350;
-
         const noiseGain = ctx.createGain();
         noiseGain.gain.setValueAtTime(0.8, now);
         noiseGain.gain.exponentialRampToValueAtTime(0.001, now + duration);
-
         source.connect(lp);
         lp.connect(noiseGain);
-        noiseGain.connect(ctx.destination);
+        noiseGain.connect(this._getFxBus());
         source.start(now);
 
-        // Thud grave
-        const osc = ctx.createOscillator();
+        const osc     = ctx.createOscillator();
         const oscGain = ctx.createGain();
         osc.connect(oscGain);
-        oscGain.connect(ctx.destination);
-
+        oscGain.connect(this._getFxBus());
         osc.type = 'sine';
         osc.frequency.setValueAtTime(110, now);
         osc.frequency.exponentialRampToValueAtTime(18, now + 0.45);
-
         oscGain.gain.setValueAtTime(0.55, now);
         oscGain.gain.exponentialRampToValueAtTime(0.001, now + 0.45);
-
         osc.start(now);
         osc.stop(now + 0.45);
     }
 
-    // Som grave e profundo ao lançar pedras de lava
-    playEruptionLaunch() {
-        const ctx = this._getCtx();
-        const now = ctx.currentTime;
-
-        const osc  = ctx.createOscillator();
-        const gain = ctx.createGain();
-
-        osc.type = 'sine';
-        osc.frequency.setValueAtTime(200, now);
-        osc.frequency.exponentialRampToValueAtTime(55, now + 1.1);
-
-        gain.gain.setValueAtTime(0.55, now);
-        gain.gain.exponentialRampToValueAtTime(0.001, now + 1.1);
-
-        osc.connect(gain);
-        gain.connect(ctx.destination);
-        osc.start(now);
-        osc.stop(now + 1.1);
-
-        // Camada de ruído grave — dá textura rochosa ao som
-        const bufSize = Math.floor(ctx.sampleRate * 0.5);
-        const buffer  = ctx.createBuffer(1, bufSize, ctx.sampleRate);
-        const data    = buffer.getChannelData(0);
-        for (let i = 0; i < bufSize; i++) {
-            data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (bufSize * 0.35));
-        }
-        const noise   = ctx.createBufferSource();
-        noise.buffer  = buffer;
-        const lp      = ctx.createBiquadFilter();
-        lp.type       = 'lowpass';
-        lp.frequency.value = 180;
-        const nGain   = ctx.createGain();
-        nGain.gain.setValueAtTime(0.35, now);
-        nGain.gain.exponentialRampToValueAtTime(0.001, now + 0.5);
-        noise.connect(lp);
-        lp.connect(nGain);
-        nGain.connect(ctx.destination);
-        noise.start(now);
-    }
-
     // Alerta da torre de radar: sonar ping + klaxon militar
-    //
-    // Fase 1 (0.00–0.55 s): sine 1050 Hz com eco — o "ping" clássico de sonar/radar
-    // Fase 2 (0.65–1.85 s): 3× klaxon sawtooth 660→440 Hz — sirene de deteção confirmada
-    //
-    // A onda sawtooth é o que dá o carácter "BWAH" de klaxon militar,
-    // diferente dos beeps de onda quadrada que soam mais a computador.
     playRadarAlert() {
         const ctx = this._getCtx();
         const now = ctx.currentTime;
 
-        // ── Sonar ping (tom puro, decaimento lento) ───────────────────────────
         const pingOsc  = ctx.createOscillator();
         const pingGain = ctx.createGain();
         pingOsc.connect(pingGain);
-        pingGain.connect(ctx.destination);
-
+        pingGain.connect(this._getFxBus());
         pingOsc.type = 'sine';
         pingOsc.frequency.setValueAtTime(1050, now);
-
         pingGain.gain.setValueAtTime(0.50, now);
         pingGain.gain.exponentialRampToValueAtTime(0.001, now + 0.55);
-
         pingOsc.start(now);
         pingOsc.stop(now + 0.55);
 
-        // ── Klaxon militar (3× "BWAH") ────────────────────────────────────────
-        // Sawtooth: rico em harmónicos, dá a qualidade de sirene/buzina
-        // Frequência desce de 660→440 Hz — é este sweep descendente que cria o "BWAH"
         for (let i = 0; i < 3; i++) {
             const t0   = now + 0.65 + i * 0.40;
             const osc  = ctx.createOscillator();
             const gain = ctx.createGain();
             osc.connect(gain);
-            gain.connect(ctx.destination);
-
+            gain.connect(this._getFxBus());
             osc.type = 'sawtooth';
             osc.frequency.setValueAtTime(660, t0);
             osc.frequency.exponentialRampToValueAtTime(440, t0 + 0.30);
-
             gain.gain.setValueAtTime(0, t0);
             gain.gain.linearRampToValueAtTime(0.22, t0 + 0.02);
             gain.gain.setValueAtTime(0.22, t0 + 0.26);
             gain.gain.linearRampToValueAtTime(0, t0 + 0.36);
-
             osc.start(t0);
             osc.stop(t0 + 0.40);
         }
     }
 
-    // Explosão seca ao impactar no chão
+    playRadarScan() {
+        if (this._scanSource) return;
+        this._loadScanBuffer().then(() => {
+            if (!this._scanBuffer || this._scanSource) return;
+            const ctx    = this._getCtx();
+            const source = ctx.createBufferSource();
+            source.buffer = this._scanBuffer;
+            source.loop   = true;
+            const gain = ctx.createGain();
+            gain.gain.setValueAtTime(CONFIG.RADAR_SCAN_SOUND.VOLUME, ctx.currentTime);
+            source.connect(gain);
+            gain.connect(this._getFxBus());
+            source.start();
+            this._scanSource = source;
+            this._scanGain   = gain;
+            source.onended = () => { this._scanSource = null; this._scanGain = null; };
+        });
+    }
+
+    stopRadarScan() {
+        if (!this._scanSource) return;
+        try {
+            const ctx = this._getCtx();
+            this._scanGain.gain.setTargetAtTime(0, ctx.currentTime, 0.08);
+            this._scanSource.stop(ctx.currentTime + 0.3);
+        } catch (e) {}
+        this._scanSource = null;
+        this._scanGain   = null;
+    }
+
+    playEruptionLaunch() {
+        const cfg = CONFIG.ERUPTION_SOUNDS;
+        this._loadEruptionBuffers().then(() => {
+            this._playBuffer(this._launchBuffer, cfg.LAUNCH_VOLUME, cfg.LAUNCH_OFFSET, cfg.LAUNCH_DURATION);
+        });
+    }
+
     playEruptionImpact() {
-        const ctx      = this._getCtx();
-        const now      = ctx.currentTime;
-        const duration = 0.5;
-
-        const bufSize = Math.floor(ctx.sampleRate * duration);
-        const buffer  = ctx.createBuffer(1, bufSize, ctx.sampleRate);
-        const data    = buffer.getChannelData(0);
-        for (let i = 0; i < bufSize; i++) {
-            data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (bufSize * 0.1));
-        }
-
-        const source = ctx.createBufferSource();
-        source.buffer = buffer;
-
-        const lp = ctx.createBiquadFilter();
-        lp.type  = 'lowpass';
-        lp.frequency.value = 380;
-
-        const gain = ctx.createGain();
-        gain.gain.setValueAtTime(1.1, now);
-        gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
-
-        source.connect(lp);
-        lp.connect(gain);
-        gain.connect(ctx.destination);
-        source.start(now);
-
-        // Thud grave de impacto
-        const osc     = ctx.createOscillator();
-        const oscGain = ctx.createGain();
-        osc.type = 'sine';
-        osc.frequency.setValueAtTime(90, now);
-        osc.frequency.exponentialRampToValueAtTime(20, now + 0.35);
-        oscGain.gain.setValueAtTime(0.5, now);
-        oscGain.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
-        osc.connect(oscGain);
-        oscGain.connect(ctx.destination);
-        osc.start(now);
-        osc.stop(now + 0.35);
+        const cfg = CONFIG.ERUPTION_SOUNDS;
+        this._loadEruptionBuffers().then(() => {
+            this._playBuffer(this._impactBuffer, cfg.IMPACT_VOLUME, cfg.IMPACT_OFFSET, cfg.IMPACT_DURATION);
+        });
     }
 }

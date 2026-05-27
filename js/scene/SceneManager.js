@@ -480,6 +480,7 @@ export class SceneManager {
 
                     if (this.radarTower.state === 'destroyed') {
                         this.score += CONFIG.RADAR_TOWER.DESTROY_SCORE;
+                        this.audio.stopRadarScan();
                         this.audio.playDestroy();
                     }
                 }
@@ -619,6 +620,7 @@ export class SceneManager {
 
     _showGameOver() {
         this._gameOver = true;
+        this.audio.stopMusic();
         const key = 'battlezone_highscore';
         const hs   = parseInt(localStorage.getItem(key) || '0', 10);
         if (this.score > hs) localStorage.setItem(key, String(this.score));
@@ -652,12 +654,14 @@ export class SceneManager {
         this._paused = true;
         this._pauseEl.style.display = 'flex';
         document.exitPointerLock?.();
+        this.audio.pauseAudio();
         this.clock.getDelta(); // descarta o delta acumulado durante a pausa
     }
 
     resume() {
         this._paused = false;
         this._pauseEl.style.display = 'none';
+        this.audio.resumeAudio();
     }
 
     _triggerHitFlash() {
@@ -738,11 +742,18 @@ export class SceneManager {
 
         // ── Torre de radar ────────────────────────────────────────────────────
         // update() é sempre chamado — quando destroyed, corre apenas a animação de queda
+        const prevRadarState = this.radarTower.state;
         this.radarTower.update(delta, this.player.tank.position);
+        const curRadarState  = this.radarTower.state;
 
-        if (this.radarTower.state === 'detected') {
+        if (curRadarState === 'detected') {
+            this.audio.stopRadarScan();
             this._onRadarDetection();
             this.radarTower.enterCooldown();
+        } else if (curRadarState === 'scanning' && prevRadarState !== 'scanning') {
+            this.audio.playRadarScan();
+        } else if (curRadarState !== 'scanning' && prevRadarState === 'scanning') {
+            this.audio.stopRadarScan();
         }
 
         // Countdown do alerta forçado nos inimigos (ALERTED_BY_RADAR)

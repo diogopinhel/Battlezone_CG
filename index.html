@@ -19,8 +19,32 @@
             <nav id="start-nav">
                 <button class="menu-btn" id="btn-start">INICIAR</button>
                 <button class="menu-btn" id="btn-credits">CRÉDITOS</button>
+                <button class="menu-btn" id="btn-settings">DEFINIÇÕES</button>
                 <button class="menu-btn" id="btn-quit">SAIR</button>
             </nav>
+        </div>
+    </div>
+
+    <!-- Overlay de definições -->
+    <div id="settings-overlay">
+        <div class="overlay-box">
+            <h2 class="overlay-title">DEFINIÇÕES</h2>
+            <div class="sound-panel">
+                <p class="sound-panel-title">SOM</p>
+                <div class="sound-row">
+                    <label>MÚSICA</label>
+                    <input type="range" min="0" max="1" step="0.01" value="0.7"
+                           class="vol-slider" id="vol-music-settings">
+                    <span class="vol-value" id="lbl-music-settings">70%</span>
+                </div>
+                <div class="sound-row">
+                    <label>EFEITOS</label>
+                    <input type="range" min="0" max="1" step="0.01" value="0.7"
+                           class="vol-slider" id="vol-fx-settings">
+                    <span class="vol-value" id="lbl-fx-settings">70%</span>
+                </div>
+            </div>
+            <button class="menu-btn" id="btn-settings-back">VOLTAR</button>
         </div>
     </div>
 
@@ -45,7 +69,22 @@
             <h2 class="overlay-title">PAUSA</h2>
             <nav id="pause-nav">
                 <button class="menu-btn" id="btn-resume">CONTINUAR</button>
-                <button class="menu-btn" id="btn-pause-quit">SAIR PARA MENU</button>    
+                <div class="sound-panel">
+                    <p class="sound-panel-title">SOM</p>
+                    <div class="sound-row">
+                        <label>MÚSICA</label>
+                        <input type="range" min="0" max="1" step="0.01" value="0.7"
+                               class="vol-slider" id="vol-music-pause">
+                        <span class="vol-value" id="lbl-music-pause">70%</span>
+                    </div>
+                    <div class="sound-row">
+                        <label>EFEITOS</label>
+                        <input type="range" min="0" max="1" step="0.01" value="0.7"
+                               class="vol-slider" id="vol-fx-pause">
+                        <span class="vol-value" id="lbl-fx-pause">70%</span>
+                    </div>
+                </div>
+                <button class="menu-btn" id="btn-pause-quit">SAIR PARA MENU</button>
             </nav>
         </div>
     </div>

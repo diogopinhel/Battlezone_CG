@@ -340,6 +340,7 @@ html, body {
 /* ── Overlay partilhado (créditos + pausa) ───────────────────────────────── */
 
 #credits-overlay,
+#settings-overlay,
 #pause-menu {
     display: none;
     position: fixed;
@@ -400,6 +401,78 @@ html, body {
 
 #pause-nav .menu-btn {
     width: 280px;
+}
+
+/* ── Painel de volume (settings + pause) ─────────────────────────────────── */
+
+.sound-panel {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin: 4px 0;
+}
+
+.sound-panel-title {
+    font-size: 12px;
+    letter-spacing: 4px;
+    color: rgba(0, 255, 0, 0.45);
+    text-align: center;
+    border-top: 1px solid rgba(0, 255, 0, 0.2);
+    padding-top: 14px;
+    margin-bottom: 2px;
+}
+
+.sound-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.sound-row label {
+    font-size: 13px;
+    letter-spacing: 3px;
+    width: 72px;
+    text-align: right;
+    color: rgba(0, 255, 0, 0.8);
+}
+
+.vol-slider {
+    flex: 1;
+    -webkit-appearance: none;
+    appearance: none;
+    height: 3px;
+    background: rgba(0, 255, 0, 0.2);
+    outline: none;
+    border: none;
+    cursor: pointer;
+}
+
+.vol-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 14px;
+    height: 14px;
+    background: #00ff00;
+    cursor: pointer;
+    box-shadow: 0 0 8px rgba(0, 255, 0, 0.8);
+}
+
+.vol-slider::-moz-range-thumb {
+    width: 14px;
+    height: 14px;
+    background: #00ff00;
+    border: none;
+    cursor: pointer;
+    box-shadow: 0 0 8px rgba(0, 255, 0, 0.8);
+}
+
+.vol-value {
+    font-size: 12px;
+    letter-spacing: 1px;
+    width: 36px;
+    text-align: left;
+    color: rgba(0, 255, 0, 0.6);
 }
 
 /* ── Barra de scan da torre de radar ─────────────────────────────────────── */

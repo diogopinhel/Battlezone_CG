@@ -157,6 +157,26 @@ export const CONFIG = {
         LEVEL_MESSAGE_TIME: 2.2,         // segundos que a mensagem de nivel fica visivel
     },
 
+    // Sons de erupção do vulcão — ficheiro único com as duas fases
+    // offset: segundos de início no ficheiro | duration: segundos a reproduzir (null = até ao fim)
+    ERUPTION_SOUNDS: {
+        LAUNCH_FILE:     './audio/volcano_eruption.MP3',
+        LAUNCH_OFFSET:   0,      // começa no início do ficheiro
+        LAUNCH_DURATION: 4.12,   // para antes do impacto
+        LAUNCH_VOLUME:   0.8,
+
+        IMPACT_FILE:     './audio/volcano_eruption.MP3',
+        IMPACT_OFFSET:   4.06,   // rocha a bater no chão
+        IMPACT_DURATION: null,   // reproduz até ao fim
+        IMPACT_VOLUME:   0.7,
+    },
+
+    // Som de scan do radar — toca em loop enquanto o jogador está no feixe
+    RADAR_SCAN_SOUND: {
+        FILE:   './audio/radar_scan.wav',
+        VOLUME: 0.6,
+    },
+
     // Pickups de vida no mapa
     LIFE_PICKUP: {
         INITIAL:        2,   // vidas no início do jogo
