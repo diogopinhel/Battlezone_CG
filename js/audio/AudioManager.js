@@ -2,19 +2,21 @@ import { CONFIG } from '../utils/Constants.js';
 
 export class AudioManager {
     constructor() {
-        this._ctx             = null;
-        this._launchBuffer    = null;
-        this._impactBuffer    = null;
-        this._scanBuffer      = null;
-        this._themeBuffer     = null;
-        this._scanSource      = null;
-        this._scanGain        = null;
-        this._themeSource     = null;
-        this._fxBus           = null;
-        this._musicBus        = null;
-        this._musicVolume     = 0.7;
-        this._fxVolume        = 0.7;
-        this._eruptionLoading = false;
+        this._ctx               = null;
+        this._launchBuffer      = null;
+        this._impactBuffer      = null;
+        this._scanBuffer        = null;
+        this._themeBuffer       = null;
+        this._bossThemeBuffer   = null;
+        this._scanSource        = null;
+        this._scanGain          = null;
+        this._themeSource       = null;
+        this._bossThemeSource   = null;
+        this._fxBus             = null;
+        this._musicBus          = null;
+        this._musicVolume       = 0.7;
+        this._fxVolume          = 0.7;
+        this._eruptionLoading   = false;
     }
 
     // ── Buses de volume master ────────────────────────────────────────────────
@@ -105,6 +107,16 @@ export class AudioManager {
         source.start(ctx.currentTime, offset, duration ?? undefined);
     }
 
+    async _loadBossThemeBuffer() {
+        if (this._bossThemeBuffer) return;
+        const ctx = this._getCtx();
+        try {
+            const res = await fetch('./audio/boss_theme.ogg');
+            const arr = await res.arrayBuffer();
+            this._bossThemeBuffer = await ctx.decodeAudioData(arr);
+        } catch (e) {}
+    }
+
     // ── Contexto ──────────────────────────────────────────────────────────────
 
     _getCtx() {
@@ -138,6 +150,74 @@ export class AudioManager {
         if (!this._themeSource) return;
         try { this._themeSource.stop(); } catch (e) {}
         this._themeSource = null;
+    }
+
+    playBossTheme() {
+        if (this._bossThemeSource) return;
+        this._loadBossThemeBuffer().then(() => {
+            if (!this._bossThemeBuffer || this._bossThemeSource) return;
+            const ctx    = this._getCtx();
+            const source = ctx.createBufferSource();
+            source.buffer = this._bossThemeBuffer;
+            source.loop   = true;
+            source.connect(this._getMusicBus());
+            source.start();
+            this._bossThemeSource = source;
+            source.onended = () => { this._bossThemeSource = null; };
+        });
+    }
+
+    stopBossTheme() {
+        if (!this._bossThemeSource) return;
+        try { this._bossThemeSource.stop(); } catch (e) {}
+        this._bossThemeSource = null;
+    }
+
+    playThunder() {
+        const ctx  = this._getCtx();
+        const now  = ctx.currentTime;
+        // Crack inicial (alta frequência, curto)
+        const crackDur  = 0.18;
+        const crackSize = Math.floor(ctx.sampleRate * crackDur);
+        const crackBuf  = ctx.createBuffer(1, crackSize, ctx.sampleRate);
+        const crackData = crackBuf.getChannelData(0);
+        for (let i = 0; i < crackSize; i++) {
+            crackData[i] = (Math.random() * 2 - 1) * Math.exp(-i / (crackSize * 0.08));
+        }
+        const crackSrc = ctx.createBufferSource();
+        crackSrc.buffer = crackBuf;
+        const crackHp = ctx.createBiquadFilter();
+        crackHp.type = 'highpass';
+        crackHp.frequency.value = 1200;
+        const crackGain = ctx.createGain();
+        crackGain.gain.setValueAtTime(1.1, now);
+        crackSrc.connect(crackHp);
+        crackHp.connect(crackGain);
+        crackGain.connect(this._getFxBus());
+        crackSrc.start(now);
+
+        // Rumble (grave, longo)
+        const rumbleDur  = 2.8;
+        const rumbleSize = Math.floor(ctx.sampleRate * rumbleDur);
+        const rumbleBuf  = ctx.createBuffer(1, rumbleSize, ctx.sampleRate);
+        const rumbleData = rumbleBuf.getChannelData(0);
+        for (let i = 0; i < rumbleSize; i++) {
+            const t   = i / ctx.sampleRate;
+            const env = t < 0.05 ? t / 0.05 : Math.exp(-(t - 0.05) * 1.4);
+            rumbleData[i] = (Math.random() * 2 - 1) * env;
+        }
+        const rumbleSrc = ctx.createBufferSource();
+        rumbleSrc.buffer = rumbleBuf;
+        const rumbleLp = ctx.createBiquadFilter();
+        rumbleLp.type = 'lowpass';
+        rumbleLp.frequency.value = 400;
+        const rumbleGain = ctx.createGain();
+        rumbleGain.gain.setValueAtTime(1.4, now + 0.05);
+        rumbleGain.gain.exponentialRampToValueAtTime(0.001, now + rumbleDur);
+        rumbleSrc.connect(rumbleLp);
+        rumbleLp.connect(rumbleGain);
+        rumbleGain.connect(this._getFxBus());
+        rumbleSrc.start(now + 0.05);
     }
 
     pauseAudio() {

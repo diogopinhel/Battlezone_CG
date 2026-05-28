@@ -66,6 +66,22 @@ export class Lighting {
         this._volcanoMat = mat;
     }
 
+    // ── Boss mode — paleta de cores ───────────────────────────────────────────
+
+    enterBossMode() {
+        this._savedAmbientColor = this.ambientLight.color.clone();
+        this._savedDirColor     = this.directionalLight.color.clone();
+        // Tom ligeiramente avermelhado (não full red — ambiente subtil)
+        this.ambientLight.color.setHex(0x602020);
+        this.directionalLight.color.setHex(0x804030);
+    }
+
+    exitBossMode() {
+        if (!this._savedAmbientColor) return;
+        this.ambientLight.color.copy(this._savedAmbientColor);
+        this.directionalLight.color.copy(this._savedDirColor);
+    }
+
     // ── Toggles individuais ───────────────────────────────────────────────────
     //
     // Usar .visible em vez de remover/adicionar da cena: mais rápido e o Three.js

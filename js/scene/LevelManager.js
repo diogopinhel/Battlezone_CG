@@ -2,7 +2,7 @@ import { CONFIG } from '../utils/Constants.js';
 
 export class LevelManager {
     constructor() {
-        this.level = 1;
+        this.level = 5; // TESTE: começa no nível 5 para testar o boss
         this.waveTotalEnemies = 0;
         this.waveKilledEnemies = 0;
         this.startWave();

@@ -533,6 +533,109 @@ html, body {
     100% { opacity: 0; transform: translate(-50%, -56%) scale(1.05); }
 }
 
+/* ── Boss mode — HUD e elementos viram vermelho ──────────────────────────── */
+
+body.boss-mode #hud-lives,
+body.boss-mode #hud-score,
+body.boss-mode #hud-level,
+body.boss-mode #hud-progress-label {
+    color: #ff2200;
+    text-shadow: 0 0 8px #ff2200, 0 0 18px #aa0000;
+}
+
+body.boss-mode #hud-progress-track {
+    border-color: #ff2200;
+    background: rgba(30, 0, 0, 0.82);
+    box-shadow: 0 0 8px rgba(255, 34, 0, 0.35);
+}
+
+body.boss-mode #hud-progress-fill {
+    background: #ff2200;
+    box-shadow: 0 0 12px rgba(255, 34, 0, 0.85);
+}
+
+body.boss-mode #hud-radar-frame {
+    border-color: #ff2200;
+    box-shadow: 0 0 10px rgba(255, 34, 0, 0.4), inset 0 0 10px rgba(0, 0, 0, 0.6);
+}
+
+body.boss-mode #hud-radar-label {
+    color: rgba(255, 34, 0, 0.6);
+}
+
+body.boss-mode #crosshair::before,
+body.boss-mode #crosshair::after {
+    background: rgba(255, 34, 0, 0.85);
+    box-shadow: 0 0 4px rgba(255, 34, 0, 0.6);
+}
+
+/* ── Mensagem do boss ────────────────────────────────────────────────────── */
+
+#boss-message {
+    position: fixed;
+    top: 35%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    color: #ff2200;
+    text-align: center;
+    text-shadow: 0 0 20px #ff2200, 0 0 50px #ff0000;
+    z-index: 30;
+    pointer-events: none;
+}
+
+#boss-message.warning {
+    display: flex;
+    /* sem animação — fica estático até ser substituído */
+}
+
+#boss-message.active {
+    display: flex;
+    animation: boss-msg-anim 3.8s ease-out forwards;
+}
+
+#boss-message span {
+    font-size: 52px;
+    letter-spacing: 8px;
+}
+
+#boss-message small {
+    font-size: 16px;
+    letter-spacing: 4px;
+    color: #ff8800;
+    text-shadow: 0 0 10px #ff8800;
+}
+
+@keyframes boss-msg-anim {
+    0%   { opacity: 0; transform: translate(-50%, -44%) scale(0.92); }
+    14%  { opacity: 1; transform: translate(-50%, -50%) scale(1);    }
+    74%  { opacity: 1; transform: translate(-50%, -50%) scale(1);    }
+    100% { opacity: 0; transform: translate(-50%, -56%) scale(1.04); }
+}
+
+/* ── Flash branco do raio ────────────────────────────────────────────────── */
+
+#boss-flash {
+    position: fixed;
+    inset: 0;
+    background: rgba(255, 255, 255, 0.92);
+    pointer-events: none;
+    z-index: 200;
+    opacity: 0;
+}
+
+#boss-flash.active {
+    animation: boss-flash-anim 0.5s ease-out forwards;
+}
+
+@keyframes boss-flash-anim {
+    0%   { opacity: 0.92; }
+    100% { opacity: 0; }
+}
+
 /* ── Flash vermelho ao ser atingido ──────────────────────────────────────── */
 
 #hit-flash {

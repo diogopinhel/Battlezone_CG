@@ -7,18 +7,24 @@ export class Ground {
     }
 
     _createTexture() {
-        const size = 512;
-        const canvas = document.createElement('canvas');
-        canvas.width  = size;
-        canvas.height = size;
-        const ctx = canvas.getContext('2d');
+        this._gridCanvas = document.createElement('canvas');
+        this._gridCanvas.width  = 512;
+        this._gridCanvas.height = 512;
+        this._gridTexture = new THREE.CanvasTexture(this._gridCanvas);
+        this._gridTexture.wrapS = THREE.RepeatWrapping;
+        this._gridTexture.wrapT = THREE.RepeatWrapping;
+        this._gridTexture.repeat.set(40, 40);
+        this._drawGrid('#00cc00');
+        return this._gridTexture;
+    }
 
+    _drawGrid(color) {
+        const ctx  = this._gridCanvas.getContext('2d');
+        const size = 512;
         ctx.fillStyle = '#000000';
         ctx.fillRect(0, 0, size, size);
-
-        ctx.strokeStyle = '#00cc00';
+        ctx.strokeStyle = color;
         ctx.lineWidth = 1.5;
-
         const divisions = 8;
         const step = size / divisions;
         for (let i = 0; i <= divisions; i++) {
@@ -26,12 +32,11 @@ export class Ground {
             ctx.beginPath(); ctx.moveTo(p, 0);    ctx.lineTo(p, size); ctx.stroke();
             ctx.beginPath(); ctx.moveTo(0, p);    ctx.lineTo(size, p); ctx.stroke();
         }
+        if (this._gridTexture) this._gridTexture.needsUpdate = true;
+    }
 
-        const texture = new THREE.CanvasTexture(canvas);
-        texture.wrapS = THREE.RepeatWrapping;
-        texture.wrapT = THREE.RepeatWrapping;
-        texture.repeat.set(40, 40);
-        return texture;
+    setBossMode(active) {
+        this._drawGrid(active ? '#cc0000' : '#00cc00');
     }
 
     _createGround() {

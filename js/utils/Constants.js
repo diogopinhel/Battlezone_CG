@@ -189,6 +189,30 @@ export const CONFIG = {
         RANGE: 1000,  // mostra o mapa completo (ground = 2000×2000, half = 1000)
     },
 
+    // Boss — portal dimensional (ativa a cada TRIGGER_LEVEL_INTERVAL níveis)
+    BOSS: {
+        TRIGGER_LEVEL_INTERVAL: 5,   // boss a cada 5 níveis (5, 10, 15, ...)
+        PORTAL_HEALTH:          8,   // vida base do portal
+        SPAWN_INTERVAL:         8.0, // segundos entre spawns de tanques
+        MAX_ACTIVE_SPAWNED:     8,   // limite de tanques em simultâneo
+        DESTROY_SCORE:          500, // pontos ao destruir o portal
+        LIGHTNING_DURATION:     0.30,// duração do flash do raio (s)
+        INTRO_PAN_DURATION:     1.8, // duração da rotação da câmara (s)
+        INTRO_LIGHTNING_TIME:   2.2, // quando cai o raio (s após início da intro)
+        INTRO_ACTIVATE_TIME:    2.8, // quando o portal ativa (s após início)
+        INTRO_TOTAL_TIME:       4.5, // quando o jogador recupera controlo (s)
+    },
+
+    // Portal dimensional — posição e configuração
+    PORTAL: {
+        X: -200,
+        Z: -200,
+        BODY_RADIUS:      12,
+        LIGHT_COLOR:      0xff0000,
+        LIGHT_INTENSITY:  3.5,
+        LIGHT_DISTANCE:   220,
+    },
+
     // Torre de radar inimiga — instalação de vigilância fixa no mapa
     //
     // Restrição obrigatória para o scan ser possível num alvo parado:
@@ -208,7 +232,7 @@ export const CONFIG = {
         COOLDOWN: 180,              // segundos de cooldown após deteção
         REINFORCEMENT_BASE: 2,      // inimigos extra na 1.ª deteção
         REINFORCEMENT_STEP: 1,      // inimigos extra adicionais por deteção seguinte
-        DESTROY_SCORE: 50,          // pontos bónus ao destruir a torre
+        DESTROY_SCORE: 5,          // pontos bónus ao destruir a torre
         BODY_RADIUS: 8,             // raio de colisão física da torre
     },
 };

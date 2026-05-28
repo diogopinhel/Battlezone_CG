@@ -12,6 +12,7 @@ import { LifePickup } from '../entities/LifePickup.js';
 import { HUD } from '../ui/HUD.js';
 import { AudioManager } from '../audio/AudioManager.js';
 import { RadarTower } from './RadarTower.js';
+import { Portal } from './Portal.js';
 
 /**
  * Classe central que gere a cena three.js.
@@ -77,6 +78,19 @@ export class SceneManager {
         // (para colisão física dos tanques e projéteis inimigos)
         this.environment.colliders.push(this.radarTower.collider);
 
+        // Portal dimensional (sempre presente no mapa, inativo até ao nível 5)
+        this.portal = new Portal(this.scene);
+        this.environment.colliders.push(this.portal.collider);
+
+        // Estado do boss round
+        this._bossIntroActive   = false;
+        this._bossRoundActive   = false;
+        this._bossIntroTimer    = 0;
+        this._bossLightningFired = false;
+        this._bossActivated     = false;
+        this._bossIntroPanStartQuat = null;
+        this._bossIntroPanEndQuat   = null;
+
         // Estado do alerta do radar (gestão do timer do ALERTED_BY_RADAR)
         this._radarAlertActive = false;
         this._radarAlertTimer  = 0;
@@ -85,9 +99,13 @@ export class SceneManager {
         this.hud = new HUD();
 
         // Flash ao ser atingido
-        this._hitFlashEl = document.getElementById('hit-flash');
+        this._hitFlashEl     = document.getElementById('hit-flash');
+        this._bossFlashEl    = document.getElementById('boss-flash');
         this._levelMessageEl = document.getElementById('level-message');
         this._radarAlertEl   = document.getElementById('radar-alert');
+        this._bossMsgEl      = document.getElementById('boss-message');
+        this._bossMsgTitle   = document.getElementById('boss-msg-title');
+        this._bossMsgSub     = document.getElementById('boss-msg-sub');
 
         // Estado de game over, pausa e início
         this._gameActive        = false;
@@ -317,6 +335,11 @@ export class SceneManager {
     }
 
     _advanceLevel() {
+        // Verifica se é um nível boss (5, 10, 15, ...)
+        if (this.levelManager.level % CONFIG.BOSS.TRIGGER_LEVEL_INTERVAL === 0) {
+            this._startBossIntro();
+            return;
+        }
         this.levelManager.advanceLevel();
         this._spawnEnemyWave();
         this._spawnLifePickups(CONFIG.LIFE_PICKUP.SPAWN_PER_LEVEL);
@@ -460,6 +483,25 @@ export class SceneManager {
             if (dist > 0 && dist < CONFIG.Enemy.BODY_RADIUS) {
                 const pushDir = playerPos.clone().sub(enemy.position).normalize();
                 this.player.tank.position.addScaledVector(pushDir, CONFIG.Enemy.BODY_RADIUS - dist);
+            }
+        }
+
+        // ── Projéteis do jogador contra o portal ─────────────────────────────
+        if (this.portal.state === 'active') {
+            const col = this.portal.collider;
+            for (let i = this.player.projectiles.length - 1; i >= 0; i--) {
+                const proj = this.player.projectiles[i];
+                const dx = proj.position.x - col.x;
+                const dz = proj.position.z - col.z;
+                if (dx * dx + dz * dz < col.radius * col.radius) {
+                    const result = this.portal.takeDamage(1);
+                    this.audio.playHit();
+                    this.scene.remove(proj);
+                    this.player.projectiles.splice(i, 1);
+                    if (result === 'dead') {
+                        this.audio.playDestroy();
+                    }
+                }
             }
         }
 
@@ -705,14 +747,19 @@ export class SceneManager {
         this.radarCamera.lookAt(p.x, 0, p.z);
 
         // Disparo do jogador alerta inimigos próximos (shot noise)
-        const previousShotsFired = this.player.shotsFired;
-        this.player.update(delta);
-        if (this.player.shotsFired > previousShotsFired && this.player.lastShotPosition) {
-            const difficulty = this.levelManager.getDifficulty();
-            this._alertNearbyEnemies(
-                this.player.lastShotPosition,
-                difficulty.shotNoiseRadius
-            );
+        // Durante a intro do boss o jogador fica congelado — câmara é animada manualmente
+        if (this._bossIntroActive) {
+            this._updateBossIntro(delta);
+        } else {
+            const previousShotsFired = this.player.shotsFired;
+            this.player.update(delta);
+            if (this.player.shotsFired > previousShotsFired && this.player.lastShotPosition) {
+                const difficulty = this.levelManager.getDifficulty();
+                this._alertNearbyEnemies(
+                    this.player.lastShotPosition,
+                    difficulty.shotNoiseRadius
+                );
+            }
         }
 
         this._resolveStaticCollisions(this.player.tank.position);
@@ -728,7 +775,24 @@ export class SceneManager {
 
         this._checkCollisions();
 
-        if (this.enemies.length === 0) {
+        // Portal update (sempre — gere raio, pulso, barra de vida)
+        this.portal.update(delta);
+
+        // Verifica fim do boss round (portal destruído)
+        if (this._bossRoundActive && this.portal.state === 'destroyed') {
+            this._endBossRound();
+        }
+
+        // Spawn de inimigos pelo portal durante o boss round
+        if (this._bossRoundActive && this.portal.shouldSpawn(delta)) {
+            const alive = this.enemies.filter(e => e.alive).length;
+            if (alive < CONFIG.BOSS.MAX_ACTIVE_SPAWNED) {
+                this._spawnEnemyFromPortal();
+            }
+        }
+
+        // Avança nível apenas quando fora do boss round/intro
+        if (this.enemies.length === 0 && !this._bossIntroActive && !this._bossRoundActive) {
             this._advanceLevel();
         }
 
@@ -846,6 +910,203 @@ export class SceneManager {
             });
             this.enemies.push(enemy);
         }
+    }
+
+    // ── Boss — intro, ativação e fim do round ──────────────────────────────────
+
+    _startBossIntro() {
+        this._bossIntroActive    = true;
+        this._bossIntroTimer     = 0;
+        this._bossLightningFired = false;
+        this._bossActivated      = false;
+
+        // Quaternion inicial da câmara
+        this._bossIntroPanStartQuat = this.camera.quaternion.clone();
+
+        // Quaternion alvo: câmara olha para o portal a partir da posição do jogador
+        const tmpCam = new THREE.PerspectiveCamera();
+        const tp = this.player.tank.position;
+        tmpCam.position.set(tp.x, tp.y + CONFIG.PLAYER.CAMERA_HEIGHT, tp.z);
+        tmpCam.lookAt(CONFIG.PORTAL.X, 34, CONFIG.PORTAL.Z);
+        this._bossIntroPanEndQuat = tmpCam.quaternion.clone();
+
+        // Mensagem de aviso (fica estática até o portal ativar)
+        this._showBossWarning();
+    }
+
+    _updateBossIntro(delta) {
+        this._bossIntroTimer += delta;
+
+        // Câmara roda suavemente para o portal
+        const panDur = CONFIG.BOSS.INTRO_PAN_DURATION;
+        if (this._bossIntroTimer <= panDur + 0.5) {
+            const t = Math.min(1, this._bossIntroTimer / panDur);
+            const eased = t * t * (3 - 2 * t); // smoothstep
+            this.camera.quaternion.slerpQuaternions(
+                this._bossIntroPanStartQuat,
+                this._bossIntroPanEndQuat,
+                eased
+            );
+        }
+        // Câmara segue o jogador (tank estático durante intro)
+        const tp = this.player.tank.position;
+        this.camera.position.set(tp.x, tp.y + CONFIG.PLAYER.CAMERA_HEIGHT, tp.z);
+
+        // Raio cai
+        if (!this._bossLightningFired && this._bossIntroTimer >= CONFIG.BOSS.INTRO_LIGHTNING_TIME) {
+            this._bossLightningFired = true;
+            this.portal.spawnLightning();
+            this.audio.playThunder();
+            this._triggerBossFlash();
+        }
+
+        // Portal ativa (HUD, fog, luzes, áudio)
+        if (!this._bossActivated && this._bossIntroTimer >= CONFIG.BOSS.INTRO_ACTIVATE_TIME) {
+            this._bossActivated = true;
+            this._enterBossMode();
+        }
+
+        // Jogador recupera controlo
+        if (this._bossIntroTimer >= CONFIG.BOSS.INTRO_TOTAL_TIME) {
+            this._bossIntroActive = false;
+            this._bossRoundActive = true;
+        }
+    }
+
+    _enterBossMode() {
+        // Luzes
+        this.lighting.enterBossMode();
+
+        // Fog ligeiramente avermelhada
+        this._savedFogColor = this.scene.fog.color.clone();
+        this.scene.fog.color.setHex(0x2a0000);
+
+        // Chão (grelha verde → vermelha)
+        this.ground.setBossMode(true);
+
+        // CSS HUD
+        document.body.classList.add('boss-mode');
+
+        // Áudio
+        this.audio.stopMusic();
+        this.audio.playBossTheme();
+
+        // Portal
+        this.portal.activate();
+        this.portal.setWireColor(0xff2200);
+
+        // Mensagem de ativação
+        this._showBossActivated();
+    }
+
+    _exitBossMode() {
+        // Luzes
+        this.lighting.exitBossMode();
+
+        // Fog normal
+        if (this._savedFogColor) {
+            this.scene.fog.color.copy(this._savedFogColor);
+            this._savedFogColor = null;
+        }
+
+        // Chão
+        this.ground.setBossMode(false);
+
+        // CSS HUD
+        document.body.classList.remove('boss-mode');
+
+        // Áudio
+        this.audio.stopBossTheme();
+        this.audio.playMusic();
+
+        // Portal reset para poder reativar no nível 10, 15, ...
+        this.portal.reset();
+    }
+
+    _endBossRound() {
+        this._bossRoundActive = false;
+
+        // Mata todos os inimigos restantes e cria destroços
+        for (const enemy of this.enemies) {
+            if (enemy.alive) {
+                this.wrecks.push(new Wreck(this.scene, enemy.position.clone()));
+                enemy.destroy();
+            }
+        }
+        this.enemies = [];
+
+        // Score bónus
+        this.score += CONFIG.BOSS.DESTROY_SCORE;
+
+        // Volta ao estado normal
+        this._exitBossMode();
+
+        // Avança para o próximo nível
+        this.levelManager.advanceLevel();
+        this._spawnEnemyWave();
+        this._spawnLifePickups(CONFIG.LIFE_PICKUP.SPAWN_PER_LEVEL);
+        this._showLevelMessage();
+        this._hideBossMessage();
+    }
+
+    _spawnEnemyFromPortal() {
+        const { X, Z, BODY_RADIUS } = CONFIG.PORTAL;
+        const angle = Math.random() * Math.PI * 2;
+        const dist  = BODY_RADIUS + 10; // aparece fora do colider do portal
+
+        const pos = new THREE.Vector3(
+            X + Math.cos(angle) * dist,
+            0,
+            Z + Math.sin(angle) * dist,
+        );
+
+        const difficulty = this.levelManager.getDifficulty();
+        const enemy = new Enemy(this.scene, pos, {
+            health:                   difficulty.health,
+            moveSpeedMultiplier:      difficulty.moveSpeedMultiplier,
+            fireCooldownMultiplier:   difficulty.fireCooldownMultiplier,
+            detectionRangeMultiplier: difficulty.detectionRangeMultiplier,
+            startsAlerted:            true,
+        });
+        this.enemies.push(enemy);
+    }
+
+    // ── Boss — mensagens HUD ──────────────────────────────────────────────────
+
+    _showBossWarning() {
+        if (!this._bossMsgEl) return;
+        this._bossMsgTitle.textContent = 'PORTAL DIMENSIONAL';
+        this._bossMsgSub.textContent   = 'ATIVAÇÃO IMINENTE — PREPARE-SE';
+        this._bossMsgEl.classList.remove('active', 'warning');
+        void this._bossMsgEl.offsetWidth;
+        this._bossMsgEl.classList.add('warning');
+    }
+
+    _showBossActivated() {
+        if (!this._bossMsgEl) return;
+        this._bossMsgTitle.textContent = 'PORTAL ATIVADO';
+        this._bossMsgSub.textContent   = 'DESTRUA O SPAWNER';
+        this._bossMsgEl.classList.remove('active', 'warning');
+        void this._bossMsgEl.offsetWidth;
+        this._bossMsgEl.classList.add('active');
+
+        window.clearTimeout(this._bossMsgTimer);
+        this._bossMsgTimer = window.setTimeout(() => {
+            this._bossMsgEl.classList.remove('active');
+        }, 4000);
+    }
+
+    _hideBossMessage() {
+        if (!this._bossMsgEl) return;
+        this._bossMsgEl.classList.remove('active', 'warning');
+    }
+
+    _triggerBossFlash() {
+        const el = this._bossFlashEl;
+        if (!el) return;
+        el.classList.remove('active');
+        void el.offsetWidth;
+        el.classList.add('active');
     }
 
     /**
