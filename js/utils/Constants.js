@@ -192,15 +192,21 @@ export const CONFIG = {
     // Boss — portal dimensional (ativa a cada TRIGGER_LEVEL_INTERVAL níveis)
     BOSS: {
         TRIGGER_LEVEL_INTERVAL: 5,   // boss a cada 5 níveis (5, 10, 15, ...)
-        PORTAL_HEALTH:          8,   // vida base do portal
-        SPAWN_INTERVAL:         8.0, // segundos entre spawns de tanques
-        MAX_ACTIVE_SPAWNED:     8,   // limite de tanques em simultâneo
+        PORTAL_HEALTH_BASE:     8,   // vida do portal no nível 5
+        PORTAL_HEALTH_SCALE:    2,   // +HP por boss round
+        PORTAL_HEALTH_MAX:      18,  // cap de vida do portal
+        SPAWN_INTERVAL_BASE:    8.0, // segundos entre spawns no nível 5
+        SPAWN_INTERVAL_MIN:     6.0, // cap mínimo do intervalo de spawn
+        MAX_ACTIVE_SPAWNED:     12,  // limite de tanques em simultâneo (fixo)
         DESTROY_SCORE:          500, // pontos ao destruir o portal
         LIGHTNING_DURATION:     0.30,// duração do flash do raio (s)
         INTRO_PAN_DURATION:     1.8, // duração da rotação da câmara (s)
         INTRO_LIGHTNING_TIME:   2.2, // quando cai o raio (s após início da intro)
         INTRO_ACTIVATE_TIME:    2.8, // quando o portal ativa (s após início)
         INTRO_TOTAL_TIME:       4.5, // quando o jogador recupera controlo (s)
+        HIVE_BASE_COUNT:        4,   // tanques colmeia no nível 5
+        HIVE_MAX_COUNT:         8,   // máximo de tanques colmeia
+        HIVE_SPAWN_RADIUS:      35,  // raio do anel de spawn da colmeia
     },
 
     // Portal dimensional — posição e configuração

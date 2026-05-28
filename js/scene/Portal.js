@@ -197,11 +197,13 @@ export class Portal {
 
     // ── Transições de estado ──────────────────────────────────────────────────
 
-    activate() {
-        this.state       = 'active';
-        this._hp         = this._maxHp;
-        this._spawnTimer = CONFIG.BOSS.SPAWN_INTERVAL * 0.4; // primeiro spawn mais cedo
-        this._pulseTime  = 0;
+    activate({ health = CONFIG.BOSS.PORTAL_HEALTH_BASE, spawnInterval = CONFIG.BOSS.SPAWN_INTERVAL_BASE } = {}) {
+        this.state          = 'active';
+        this._maxHp         = health;
+        this._hp            = health;
+        this._spawnInterval = spawnInterval;
+        this._spawnTimer    = spawnInterval * 0.4; // primeiro spawn mais cedo
+        this._pulseTime     = 0;
         this._hpBarSprite.visible = false;
         this._drawHealthBar();
     }
@@ -248,7 +250,7 @@ export class Portal {
         if (this.state !== 'active') return false;
         this._spawnTimer -= delta;
         if (this._spawnTimer <= 0) {
-            this._spawnTimer = CONFIG.BOSS.SPAWN_INTERVAL;
+            this._spawnTimer = this._spawnInterval;
             return true;
         }
         return false;

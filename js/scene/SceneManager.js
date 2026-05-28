@@ -83,11 +83,12 @@ export class SceneManager {
         this.environment.colliders.push(this.portal.collider);
 
         // Estado do boss round
-        this._bossIntroActive   = false;
-        this._bossRoundActive   = false;
-        this._bossIntroTimer    = 0;
+        this._bossIntroActive    = false;
+        this._bossRoundActive    = false;
+        this._bossHiveActive     = false; // fase colmeia: portal morreu, aguarda tanques
+        this._bossIntroTimer     = 0;
         this._bossLightningFired = false;
-        this._bossActivated     = false;
+        this._bossActivated      = false;
         this._bossIntroPanStartQuat = null;
         this._bossIntroPanEndQuat   = null;
 
@@ -778,14 +779,19 @@ export class SceneManager {
         // Portal update (sempre — gere raio, pulso, barra de vida)
         this.portal.update(delta);
 
-        // Verifica fim do boss round (portal destruído)
-        if (this._bossRoundActive && this.portal.state === 'destroyed') {
+        // Portal destruído → arranca a fase colmeia (burst de tanques em anel)
+        if (this._bossRoundActive && !this._bossHiveActive && this.portal.state === 'destroyed') {
+            this._startHiveBurst();
+        }
+
+        // Fase colmeia: todos os tanques mortos → fim do boss round
+        if (this._bossHiveActive && this.enemies.length === 0) {
             this._endBossRound();
         }
 
-        // Spawn de inimigos pelo portal durante o boss round
-        if (this._bossRoundActive && this.portal.shouldSpawn(delta)) {
-            const alive = this.enemies.filter(e => e.alive).length;
+        // Spawn de inimigos pelo portal (apenas enquanto portal ativo, antes da colmeia)
+        if (this._bossRoundActive && !this._bossHiveActive && this.portal.shouldSpawn(delta)) {
+            const alive = this.enemies.length;
             if (alive < CONFIG.BOSS.MAX_ACTIVE_SPAWNED) {
                 this._spawnEnemyFromPortal();
             }
@@ -916,6 +922,8 @@ export class SceneManager {
 
     _startBossIntro() {
         this._bossIntroActive    = true;
+        this._bossRoundActive    = false;
+        this._bossHiveActive     = false;
         this._bossIntroTimer     = 0;
         this._bossLightningFired = false;
         this._bossActivated      = false;
@@ -991,8 +999,12 @@ export class SceneManager {
         this.audio.stopMusic();
         this.audio.playBossTheme();
 
-        // Portal
-        this.portal.activate();
+        // Portal — valores escalados com o boss index
+        const cfg      = CONFIG.BOSS;
+        const bossIdx  = Math.floor(this.levelManager.level / cfg.TRIGGER_LEVEL_INTERVAL);
+        const health   = Math.min(cfg.PORTAL_HEALTH_MAX,   cfg.PORTAL_HEALTH_BASE   + (bossIdx - 1) * cfg.PORTAL_HEALTH_SCALE);
+        const interval = Math.max(cfg.SPAWN_INTERVAL_MIN,  cfg.SPAWN_INTERVAL_BASE  - (bossIdx - 1) * 1.0);
+        this.portal.activate({ health, spawnInterval: interval });
         this.portal.setWireColor(0xff2200);
 
         // Mensagem de ativação
@@ -1023,22 +1035,43 @@ export class SceneManager {
         this.portal.reset();
     }
 
+    _startHiveBurst() {
+        this._bossHiveActive = true;
+
+        const cfg = CONFIG.BOSS;
+        const bossIndex  = Math.floor(this.levelManager.level / cfg.TRIGGER_LEVEL_INTERVAL);
+        const hiveCount  = Math.min(cfg.HIVE_MAX_COUNT, cfg.HIVE_BASE_COUNT + (bossIndex - 1));
+        const { X, Z }   = CONFIG.PORTAL;
+        const difficulty = this.levelManager.getDifficulty();
+
+        for (let i = 0; i < hiveCount; i++) {
+            const angle = (i / hiveCount) * Math.PI * 2;
+            const pos   = new THREE.Vector3(
+                X + Math.cos(angle) * cfg.HIVE_SPAWN_RADIUS,
+                0,
+                Z + Math.sin(angle) * cfg.HIVE_SPAWN_RADIUS,
+            );
+            const enemy = new Enemy(this.scene, pos, {
+                health:                   difficulty.health + 1, // guardião ligeiramente mais resistente
+                moveSpeedMultiplier:      difficulty.moveSpeedMultiplier * 1.15,
+                fireCooldownMultiplier:   difficulty.fireCooldownMultiplier * 0.9,
+                detectionRangeMultiplier: difficulty.detectionRangeMultiplier,
+                startsAlerted:            true,
+            });
+            this.enemies.push(enemy);
+        }
+
+        this._showBossHiveMessage(hiveCount);
+    }
+
     _endBossRound() {
         this._bossRoundActive = false;
-
-        // Mata todos os inimigos restantes e cria destroços
-        for (const enemy of this.enemies) {
-            if (enemy.alive) {
-                this.wrecks.push(new Wreck(this.scene, enemy.position.clone()));
-                enemy.destroy();
-            }
-        }
-        this.enemies = [];
+        this._bossHiveActive  = false;
 
         // Score bónus
         this.score += CONFIG.BOSS.DESTROY_SCORE;
 
-        // Volta ao estado normal
+        // Volta ao estado normal (cores, áudio, portal)
         this._exitBossMode();
 
         // Avança para o próximo nível
@@ -1094,6 +1127,20 @@ export class SceneManager {
         this._bossMsgTimer = window.setTimeout(() => {
             this._bossMsgEl.classList.remove('active');
         }, 4000);
+    }
+
+    _showBossHiveMessage(count) {
+        if (!this._bossMsgEl) return;
+        this._bossMsgTitle.textContent = 'PORTAL DESTRUÍDO';
+        this._bossMsgSub.textContent   = `ELIMINA OS ${count} GUARDIÕES`;
+        this._bossMsgEl.classList.remove('active', 'warning');
+        void this._bossMsgEl.offsetWidth;
+        this._bossMsgEl.classList.add('active');
+
+        window.clearTimeout(this._bossMsgTimer);
+        this._bossMsgTimer = window.setTimeout(() => {
+            this._bossMsgEl.classList.remove('active');
+        }, 4500);
     }
 
     _hideBossMessage() {
